@@ -2,28 +2,31 @@ import scrapy
 import pandas
 
 
-class Actors_imdb(scrapy.Spider):
+class Actors_wiki(scrapy.Spider):
     """
     This class is used to scrape a particular wikipedia page,
     find a table, and save the table in CSV format.
     """
     name = 'actors'
-    allowed_domains = ["https://www.imdb.com/"]
-    start_urls = ["https://www.imdb.com/title/tt0111161/fullcredits?ref_=tt_cl_sm"]
+    allowed_domains = ["https://en.wikipedia.org/"]
+    start_urls = ["https://en.wikipedia.org/wiki/Guardians_of_the_Galaxy_(film)"]
 
-# consider the following xpaths to get the anchor tags of the actors:
-# response.xpath('//table[@class="cast_list"]/tr[@class="odd"]/td[not(@*)]/a/@href').getall()
-# response.xpath('//table[@class="cast_list"]/tr[@class="even"]/td[not(@*)]/a/@href').getall()
-# and use these xpaths to get the actor names
-# response.xpath('//table[@class="cast_list"]/tr[@class="odd"]/td[not(@*)]/a/text()').getall()
-# response.xpath('//table[@class="cast_list"]/tr[@class="even"]/td[not(@*)]/a/text()').getall()
-# To filter we can consider
-# response.xpath('//table[@class="cast_list"]/tr[@class="even"]/td[@class="character"]/text').getall(),
-# zip this list with the two above (actor anchor tags and names, both for evens),
-# then see if the second entry contains "uncredited" after removing whitespace and newlines.
+# When on a film's page, use the following xpath to get the cast names (under Starring):
+# response.xpath('//tr[contains(th, "Starring")]/td/div/ul/li/text()').getall()
+# response.xpath('//tr[contains(th, "Starring")]/td/div/ul/li/a/text()').getall()
+# and this xpath to get the anchor tags
+# response.xpath('//tr[contains(th, "Starring")]/td/div/ul/li/a/@href').getall().
+# Use this xpath to get the name of the film:
+# response.xpath('//h1[@id="firstHeading"]/i/text()').getall()
 
-# Still need to find movie name to add to table, consider how to click on the actor anchor tag,
-# and how to select movies from each actor's page.
+# When on an actor's page, use the following xpath to get the names of the films they have
+# starred in with hyperlinks
+# response.xpath('//div/h3[contains(span, "Film")]/following-sibling::table[1]/tbody/tr/td/i/a/text()').getall()
+# and use this xpath to get the anchor tags
+# response.xpath('//div/h3[contains(span, "Film")]/following-sibling::table[1]/tbody/tr/td/i/a/@href').getall()
+
+
+
 
     def parse(self, response):
         """
