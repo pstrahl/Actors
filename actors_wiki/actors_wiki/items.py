@@ -11,8 +11,18 @@ class CastItem(scrapy.Item):
     actor_name = scrapy.Field()
 
 
-class MovieItem(scrapy.Item):
+class DirectorItem(scrapy.Item):
     film = scrapy.Field()
     director = scrapy.Field()
+
+
+class MovieItem(scrapy.Item):
+    film = scrapy.Field()
     budget = scrapy.Field()
     box_office = scrapy.Field()
+    release_date = scrapy.Field()
+
+
+class ProductionCoItem(scrapy.Item):
+    film = scrapy.Field()
+    prod_co = scrapy.Field()

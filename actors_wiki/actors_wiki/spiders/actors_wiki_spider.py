@@ -4,7 +4,7 @@ from time import sleep
 
 import scrapy
 
-from actors_wiki.items import CastItem, MovieItem
+from actors_wiki.items import CastItem, DirectorItem, MovieItem, ProductionCoItem
 
 
 # Try it for a different set of years (and therefore a different initial film)
@@ -15,28 +15,11 @@ class Actorswiki(scrapy.Spider):
     """
     name = 'actors_wiki_spider'
     # allowed_domains = ["en.wikipedia.org/"]
+
     def start_requests(self):
         for num in range(2022, 2023):
             movie_by_year = "https://en.wikipedia.org/wiki/List_of_American_films_of_{}".format(num)
             yield scrapy.Request(url=movie_by_year, callback=self.parse_list)
-
-
-# When on a film's page, use the following xpath to get the cast names (under Starring):
-# response.xpath('//tr[contains(th, "Starring")]/td/div/ul/li/text()').getall()
-# response.xpath('//tr[contains(th, "Starring")]/td/div/ul/li/a/text()').getall()
-# and this xpath to get the anchor tags
-# response.xpath('//tr[contains(th, "Starring")]/td/div/ul/li/a/@href').getall().
-# Use this xpath to get the name of the film:
-# response.xpath('//h1[@id="firstHeading"]/i/text()').getall()
-
-# When on an actor's page, use the following xpath to get the names of the films they have
-# starred in with hyperlinks
-# response.xpath('//div/h3[contains(span, "Film")]/following-sibling::table[1]/tbody/tr/td/i/a/text()').getall()
-# use this xpath to get the years
-# response.xpath('//div/h3[contains(span, "Film")]/following-sibling::table[1]/tbody/tr[td[2]/i/a]/td[1]/text()').getall()
-# (remember that the years have a '/n' following, so that needs to be stripped
-# and use this xpath to get the anchor tags
-# response.xpath('//div/h3[contains(span, "Film")]/following-sibling::table[1]/tbody/tr/td/i/a/@href').getall()
 
     def parse_list(self, response):
         """
@@ -55,19 +38,33 @@ class Actorswiki(scrapy.Spider):
                 href = row.xpath('td/i/a/@href').get()
                 yield scrapy.Request(url=response.urljoin(href), callback=self.parse_films)
 
-
     def parse_films(self, response):
         """
-        Get the cast list, director(s), budget, and box office for the film.
+        Get the cast list, director(s), production companies, budget, box office, and release date for the film.
+
+        First, we produce a MovieItem with fields 'film', 'budget', 'box_office', and 'release_date'.
+        Next, we produce a DirectorItem with fields 'film', 'director' for each director of the film.
+        After this, for each production company of the film, we produce a ProductionCoItem with fields
+        'film' and 'prod_co'. Finally, for each starring cast member of the film, we produce a CastItem with
+        fields 'film' and 'actor_name'.
 
         Args:
             response (scrapy Response object): This is scrapy's representation of the
                 HTTP response object arising from the request for one of the film pages.
         """
+        # Construct a MovieItem
         film = response.xpath('//h1[@id="firstHeading"]/i/text()').get()
         budget = response.xpath('//tr[contains(th, "Budget")]/td/text()').get()
         box_office = response.xpath('//tr[contains(th, "Box office")]/td/text()').get()
-        cast_list = response.xpath('//tr[contains(th, "Starring")]/td/div/ul')
+        release_date = response.xpath('//tr[contains(th/div, "Release date")]/td/div/ul/li/span/span/text()').get()
+        m_item = MovieItem()
+        m_item["film"] = film
+        m_item["budget"] = budget
+        m_item["box_office"] = box_office
+        m_item["release_date"] = release_date
+        yield m_item
+
+        # Construct the DirectorItem(s).
         directors = response.xpath('//tr[contains(th, "Directed by")]/td/div/ul')
         if directors:
             for item in directors.xpath('li'):
@@ -76,23 +73,43 @@ class Actorswiki(scrapy.Spider):
                     director = item.xpath('a/text()').get()
                 else:
                     director = item.xpath('text()').get()
-                m_item = MovieItem()
-                m_item["film"] = film
-                m_item["director"] = director
-                m_item["budget"] = budget
-                m_item["box_office"] = box_office
-                yield m_item
+                d_item = DirectorItem()
+                d_item["film"] = film
+                d_item["director"] = director
+                yield d_item
         else:
             director = response.xpath('//tr[contains(th, "Directed by")]/td/a/text()').get()
             if not director:
                 director = response.xpath('//tr[contains(th, "Directed by")]/td/text()').get()
-            m_item = MovieItem()
-            m_item["film"] = film
-            m_item["director"] = director
-            m_item["budget"] = budget
-            m_item["box_office"] = box_office
-            yield m_item
+            d_item = DirectorItem()
+            d_item["film"] = film
+            d_item["director"] = director
+            yield d_item
 
+        # Construct the ProductionCoItem(s).
+        prod_co_list = response.xpath('//tr[contains(th/div, "Production")]/td/div/div/ul')
+        if prod_co_list:
+            for item in prod_co_list.xpath('li'):
+                sleep(2)
+                if item.xpath('a/text()').get():
+                    prod_co = item.xpath('a/text()').get()
+                else:
+                    prod_co = item.xpath('text()').get()
+                p_item = ProductionCoItem()
+                p_item["film"] = film
+                p_item["prod_co"] = prod_co
+                yield p_item
+        else:
+            prod_co = response.xpath('//tr[contains(th/div, "Production")]/td/div/a/text()').get()
+            if not prod_co:
+                prod_co = response.xpath('//tr[contains(th/div,"Production")]/td/div/text()').get()
+            p_item = ProductionCoItem()
+            p_item["film"] = film
+            p_item["prod_co"] = prod_co
+            yield p_item
+
+        # Construct the CastItem(s).
+        cast_list = response.xpath('//tr[contains(th, "Starring")]/td/div/ul')
         for item in cast_list.xpath('li'):
             sleep(2)
             c_item = CastItem()

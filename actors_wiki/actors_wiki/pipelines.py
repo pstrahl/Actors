@@ -62,11 +62,17 @@ class ActorsWikiPipeline:
                         director VARCHAR(100) NOT NULL UNIQUE
                         )"""
                             )
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS ProductionCo(
+                        prod_co_id INT AUTO_INCREMENT PRIMARY KEY,
+                        prod_co VARCHAR(200) NOT NULL UNIQUE
+                        )"""
+                            )
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS Movies(
                         movie_id INT AUTO_INCREMENT PRIMARY KEY,
                         movie VARCHAR(200) NOT NULL UNIQUE,
                         budget VARCHAR(100) DEFAULT NULL,
-                        box_office VARCHAR(100) DEFAULT NULL
+                        box_office VARCHAR(100) DEFAULT NULL,
+                        release_date DATE DEFAULT NULL
                         )"""
                             )
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS Filmdirectors(
@@ -77,6 +83,16 @@ class ActorsWikiPipeline:
                             REFERENCES Movies(movie_id),
                         FOREIGN KEY(director_id)
                             REFERENCES Directors(director_id)
+                            )"""
+                            )
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Filmprodco(
+                        movie_id INT,
+                        prod_co_id INT,
+                        PRIMARY KEY(movie_id, prod_co_id),
+                        FOREIGN KEY(movie_id)
+                            REFERENCES Movies(movie_id),
+                        FOREIGN KEY(prod_co_id)
+                            REFERENCES ProductionCo(prod_co_id)
                             )"""
                             )
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS Castlist(
@@ -92,20 +108,32 @@ class ActorsWikiPipeline:
 
     def process_item(self, item, actors_wiki_spider):
         """
-        Insert the information from the items into the Actors, Movies, and Castlist tables.
+        Insert the information from the items into the tables.
 
         Find the Movie_id for the film in the Movies table or insert the film into the Movies table
-        with budget and box office as Null values.
+        with budget, box_office, and release_date as Null values.
 
-        In the first case, the item is a MovieItem. We start by updating the budget and box_office
-        in the Movies table. Then, we either get the director_id from the Directors table or we
-        insert the director into the Directors table and get the director_id. Using this, we insert the
-        movie_id and the director_id into the Filmdirectors table.
+        In the first case, the item is a MovieItem. We start by updating the budget, box_office, and
+        release_date in the Movies table.
+
+        In the second case, the item is a DirectorItem. In this case we either get the director_id from
+        the Directors table or we insert the director into the Directors table and get the director_id.
+        Using this, we insert the movie_id and the director_id into the Filmdirectors table.
+
+        In the third case, the item is a ProductionCoItem. In this case we either get the prod_co_id from
+        the ProductionCo table or we insert the prod_co into the ProductionCo table and get the prod_co_id.
+        Using this, we insert the movie_id and the prod_co_id into the Filmprodco table.
+
+        In the last case, the item is an CastItem. In this case we either get the actor_id from the Actors
+        table or we insert the actor_name into the Actors table and get the actor_id. Using this, we insert the
+        movie_id and the actor_id into the Castlist table.
 
         Args:
-            item (Scrapy Item object): This is a CastItem or a MovieItem. CastItems have two
-                fields: 'film' and 'actor_name'. MovieItems have 4 fields: 'film', 'director', 'budget',
-                and 'box_office'.
+            item (Scrapy Item object): This is a CastItem, a DirectorItem, a MovieItem, or a
+            ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
+            have 2 fields: 'film' and 'director'. MovieItems have 5 fields: 'film', 'director', 'budget',
+            'box_office', and 'release_date'. ProductionCoItems have 2 fields: 'film' and 'prod_co'.
+
             actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
                 for movies and their starring cast in the specified time range.
 
@@ -116,35 +144,40 @@ class ActorsWikiPipeline:
         for key in item.keys():
             if isinstance(item[key], str):
                 item[key].replace('"', '')
+
         # Get the movie_id, this is used in all cases in what follows.
         film = item.get("film")
         movie_id_query = """SELECT movie_id
                             FROM Movies
                             WHERE movie = %s
                          """
-        movie_insert_query = """INSERT INTO Movies(movie, budget, box_office)
-                                VALUES (%s, %s, %s)
+        movie_insert_query = """INSERT INTO Movies(movie)
+                                VALUES (%s)
                              """
         self.cursor.execute(movie_id_query, (film,))
         movie_id = self.cursor.fetchone()
         if not movie_id:
-            self.cursor.execute(movie_insert_query, (film, "NULL", "NULL"))
+            self.cursor.execute(movie_insert_query, (film,))
             self.cursor.execute(movie_id_query, (film,))
             movie_id = self.cursor.fetchone()
 
         # In the first case the item is a MovieItem.
-        if "director" in item.keys():
+        if "budget" in item.keys():
             movies_update_query = """UPDATE Movies
                                      SET 
-                                         budget = %s,
-                                         box_office = %s
+                                        budget = %s,
+                                        box_office = %s,
+                                        release_date = %s
                                      WHERE movie_id = %s
                                   """
             budget = item.get("budget")
             box_office = item.get("box_office")
-            director = item.get("director")
-            self.cursor.execute(movies_update_query, (budget, box_office, movie_id))
+            release_date = item.get("release_date")
+            self.cursor.execute(movies_update_query, (budget, box_office, release_date, movie_id))
 
+        # In the second case the item is a DirectorItem.
+        if "director" in item.keys() and item.get("director", None):
+            director = item.get("director")
             director_id_query = """SELECT director_id
                                    FROM Directors
                                    WHERE director = %s
@@ -163,7 +196,28 @@ class ActorsWikiPipeline:
                                          """
             self.cursor.execute(filmdirectors_insert_query, (movie_id, director_id))
 
-        # In the second case the item is a CastItem.
+        # In the third case the item is a ProductionCoItem.
+        if "prod_co" in item.keys() and item.get("prod_co", None):
+            prod_co = item.get("prod_co")
+            prod_co_id_query = """SELECT prod_co_id
+                                  FROM ProductionCo
+                                  WHERE prod_co = %s
+                               """
+            prod_co_insert_query = """INSERT INTO ProductionCo(prod_co)
+                                      VALUES (%s)
+                                   """
+            self.cursor.execute(prod_co_id_query, (prod_co,))
+            prod_co_id = self.cursor.fetchone()
+            if not prod_co_id:
+                self.cursor.execute(prod_co_insert_query, (prod_co,))
+                self.cursor.execute(prod_co_id_query, (prod_co,))
+                prod_co_id = self.cursor.fetchone()
+            filmprodco_insert_query = """INSERT INTO Filmprodco(movie_id, prod_co_id)
+                                         VALUES (%s, %s)
+                                      """
+            self.cursor.execute(filmprodco_insert_query, (movie_id, prod_co_id))
+
+        # In the last case the item is a CastItem.
         if "actor_name" in item.keys():
             actor_name = item.get("actor_name")
             actor_query = """SELECT actor_id
