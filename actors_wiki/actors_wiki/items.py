@@ -5,6 +5,14 @@
 
 import scrapy
 
+
 class CastItem(scrapy.Item):
     film = scrapy.Field()
     actor_name = scrapy.Field()
+
+
+class MovieItem(scrapy.Item):
+    film = scrapy.Field()
+    director = scrapy.Field()
+    budget = scrapy.Field()
+    box_office = scrapy.Field()
