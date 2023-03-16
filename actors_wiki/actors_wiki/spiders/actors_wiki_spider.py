@@ -54,6 +54,8 @@ class Actorswiki(scrapy.Spider):
         """
         # Construct a MovieItem
         film = response.xpath('//h1[@id="firstHeading"]/i/text()').get()
+        if not film:
+            film = response.xpath('//h1[@id="firstHeading"]/span/text()').get()
         budget = response.xpath('//tr[contains(th, "Budget")]/td/text()').get()
         box_office = response.xpath('//tr[contains(th, "Box office")]/td/text()').get()
         release_date = response.xpath('//tr[contains(th/div, "Release date")]/td/div/ul/li/span/span/text()').get()
