@@ -58,7 +58,13 @@ class Actorswiki(scrapy.Spider):
             film = response.xpath('//h1[@id="firstHeading"]/span/text()').get()
         budget = response.xpath('//tr[contains(th, "Budget")]/td/text()').get()
         box_office = response.xpath('//tr[contains(th, "Box office")]/td/text()').get()
-        release_date = response.xpath('//tr[contains(th/div, "Release date")]/td/div/ul/li/span/span/text()').get()
+        release_dates = response.xpath('//tr[contains(th/div, "Release dates")]/td/div/ul')
+        if release_dates:
+            release_date = release_dates.xpath('li[contains(text(), "United States")]/span/span/text()').get()
+        else:
+            release_date = response.xpath('//tr[contains(th/div, "Release date")]/td/div/ul/li/span/span/text()').get()
+            if not release_date:
+                release_date = response.xpath('//tr[contains(th, "Original air date")]/td/span/span/text()')
         m_item = MovieItem()
         m_item["film"] = film
         m_item["budget"] = budget
