@@ -4,14 +4,14 @@ from time import sleep
 
 import scrapy
 
-from actors_wiki.items import CastItem, DirectorItem, MovieItem, ProductionCoItem
+from actors_wiki.items import CastItem, DirectorItem, DistributorItem, MovieItem, ProductionCoItem
 
 
-# Try it for a different set of years (and therefore a different initial film)
 class Actorswiki(scrapy.Spider):
     """
-    This class is used to scrape the list of films by year and scrape
-    each film's wikipedia page for the list of starring actors.
+    This class is used to scrape the list of films by year and subsequently scrape
+    each film's wikipedia page for the list of starring actors, director(s), distributor(s),
+    production companies, budget, box office, and release date.
     """
     name = 'actors_wiki_spider'
     # allowed_domains = ["en.wikipedia.org/"]
@@ -43,9 +43,12 @@ class Actorswiki(scrapy.Spider):
         Get the cast list, director(s), production companies, budget, box office, and release date for the film.
 
         First, we produce a MovieItem with fields 'film', 'budget', 'box_office', and 'release_date'.
-        Next, we produce a DirectorItem with fields 'film', 'director' for each director of the film.
-        After this, for each production company of the film, we produce a ProductionCoItem with fields
-        'film' and 'prod_co'. Finally, for each starring cast member of the film, we produce a CastItem with
+        As outlined below, there are several cases to consider for extracting the release date:
+        1) it is in a list of release dates, and we want the US release date, 2) there is a single
+        Release date listed, or 3) it is listed as the Original air date.
+
+        Next, we use build_items() to produce: DirectorItems with fields 'film', 'director',
+         ProductionCoItem with fields 'film' and 'prod_co' and CastItems with
         fields 'film' and 'actor_name'.
 
         Args:
@@ -58,13 +61,15 @@ class Actorswiki(scrapy.Spider):
             film = response.xpath('//h1[@id="firstHeading"]/span/text()').get()
         budget = response.xpath('//tr[contains(th, "Budget")]/td/text()').get()
         box_office = response.xpath('//tr[contains(th, "Box office")]/td/text()').get()
-        release_dates = response.xpath('//tr[contains(th/div, "Release dates")]/td/div/ul')
-        if release_dates:
-            release_date = release_dates.xpath('li[contains(text(), "United States")]/span/span/text()').get()
-        else:
-            release_date = response.xpath('//tr[contains(th/div, "Release date")]/td/div/ul/li/span/span/text()').get()
-            if not release_date:
-                release_date = response.xpath('//tr[contains(th, "Original air date")]/td/span/span/text()')
+
+        row = response.xpath('//tr[contains(th/div, "date") or contains(th, "date")]/td')
+        release_date = row.xpath('//li[text()[contains(., "States")]]/span/span/text()').get()
+        if not release_date:
+            release_date = row.xpath('//li[1]/span/span/text()').get()
+        if not release_date:
+            release_date = row.xpath('span/span/text()').get()
+        if not release_date:
+            release_date = row.xpath('text()').get()
         m_item = MovieItem()
         m_item["film"] = film
         m_item["budget"] = budget
@@ -72,61 +77,113 @@ class Actorswiki(scrapy.Spider):
         m_item["release_date"] = release_date
         yield m_item
 
-        # Construct the DirectorItem(s).
-        directors = response.xpath('//tr[contains(th, "Directed by")]/td/div/ul')
-        if directors:
-            for item in directors.xpath('li'):
-                sleep(2)
-                if item.xpath('a/text()').get():
-                    director = item.xpath('a/text()').get()
-                else:
-                    director = item.xpath('text()').get()
-                d_item = DirectorItem()
-                d_item["film"] = film
-                d_item["director"] = director
-                yield d_item
-        else:
-            director = response.xpath('//tr[contains(th, "Directed by")]/td/a/text()').get()
-            if not director:
-                director = response.xpath('//tr[contains(th, "Directed by")]/td/text()').get()
-            d_item = DirectorItem()
-            d_item["film"] = film
-            d_item["director"] = director
-            yield d_item
-
         # Construct the ProductionCoItem(s).
         prod_co_list = response.xpath('//tr[contains(th/div, "Production")]/td/div/div/ul')
-        if prod_co_list:
-            for item in prod_co_list.xpath('li'):
-                sleep(2)
-                if item.xpath('a/text()').get():
-                    prod_co = item.xpath('a/text()').get()
-                else:
-                    prod_co = item.xpath('text()').get()
-                p_item = ProductionCoItem()
-                p_item["film"] = film
-                p_item["prod_co"] = prod_co
-                yield p_item
-        else:
-            prod_co = response.xpath('//tr[contains(th/div, "Production")]/td/div/a/text()').get()
-            if not prod_co:
-                prod_co = response.xpath('//tr[contains(th/div,"Production")]/td/div/text()').get()
-            p_item = ProductionCoItem()
-            p_item["film"] = film
-            p_item["prod_co"] = prod_co
-            yield p_item
 
-        # Construct the CastItem(s).
-        cast_list = response.xpath('//tr[contains(th, "Starring")]/td/div/ul')
-        for item in cast_list.xpath('li'):
-            sleep(2)
-            c_item = CastItem()
-            c_item["film"] = film
-            if item.xpath('a/text()').get():
-                c_item["actor_name"] = item.xpath('a/text()').get()
+        def gen_build_items(resp, movie, item_field, item, first, second):
+            """
+            Build CastItems, DirectorItems, or ProductionCoItems.
+
+            If the items to be constructed are CastItems, single_link and single
+            are both None. Otherwise, single_link and single are the xpaths to use
+            in the case that there is a single director or production company, depending
+            on whether the text is inside an anchor tag.
+
+            Args:
+                resp (scrapy Response object): This is scrapy's representation of an HTTP
+                    response object arising from an HTTP request.
+                movie (str): This is the film title.
+                item_field (str): This is either 'actor_name', 'director', 'distributor',
+                or 'prod_co' (the fields of the items CastItem, DirectorItem, DistributorItem
+                and ProductionCoItem, respectively, excluding 'film').
+                item (class): This is a reference to either a CastItem, DirectorItem,
+                     or ProductionCoItem.
+                first (str): This is the first xpath to try in the case that there are more than one of
+                    the items of this type (CastItem, DirectorItem, or ProductionCoItem) to be
+                    associated with the movie. For CastItem, this will always be the case.
+                second (str): This is the xpath to try if the first fails to
+                    produce any results.
+
+            Returns:
+                None
+            """
+            first_path = resp.xpath(first)
+            if first_path and first_path.xpath('li'):
+                if first_path.xpath('li/a/text()'):
+                    for field in first_path.xpath('li/a/text()').getall():
+                        built_item = item()
+                        built_item["film"] = movie
+                        built_item[item_field] = field
+                        yield built_item
+                elif first_path.xpath('li/text()'):
+                    for field in first_path.xpath('li/text()').getall():
+                        built_item = item()
+                        built_item["film"] = movie
+                        built_item[item_field] = field
+                        yield built_item
+
             else:
-                c_item["actor_name"] = item.xpath('text()').get()
-            yield c_item
+                second_path = resp.xpath(second)
+                if second_path and second_path.xpath('a/text()'):
+                    for field in second_path.xpath('a/text()').getall():
+                        built_item = item()
+                        built_item["film"] = film
+                        built_item[item_field] = field
+                        yield built_item
+                elif second_path.xpath('text()'):
+                    for field in second_path.xpath('text()').getall():
+                        built_item = item()
+                        built_item["film"] = movie
+                        built_item[item_field] = field
+                        yield built_item
+
+        def build_items(resp, movie, item_field):
+            """
+            Construct the items corresponding to item_field using inner_build_items.
+
+            Args:
+                resp (scrapy Response object): This is scrapy's representation of an HTTP
+                    response object arising from an HTTP request.
+                movie (str): This is the film title.
+                item_field (str): This is either 'actor_name', 'director', or 'prod_co' (the
+                    fields of the items CastItem, DirectorItem, and ProductionCoItem,
+                     respectively, excluding 'film').
+
+            Returns:
+                gen_build_item (generator): This is the generator of items constructed
+                    using gen_build_item based on the type of the item (CastItem, DirectorItem,
+                    DistributorItem, ProductionCoItem).
+
+
+            """
+            if item_field == "actor_name":
+                item = CastItem
+                first = '//tr[contains(th, "Starring")]/td/div/ul'
+                second = '//tr[contains(th, "Starring")]/td'
+                return gen_build_items(resp, movie, item_field, item, first, second)
+            elif item_field == "director":
+                item = DirectorItem
+                first = '//tr[contains(th, "Directed by")]/td/div/ul'
+                second = '//tr[contains(th, "Directed by")]/td'
+                return gen_build_items(resp, movie, item_field, item, first, second)
+            elif item_field == "prod_co":
+                item = ProductionCoItem
+                first = '//tr[contains(th/div, "Production")]/td/div/div/ul'
+                second = '//tr[contains(th/div,"Production")]/td/div'
+                return gen_build_items(resp, movie, item_field, item, first, second)
+            elif item_field == "distributor":
+                item = DistributorItem
+                first = '//tr[contains(th, "Distributed")]/td/div/ul'
+                second = '//tr[contains(th, "Distributed")]/td'
+                return gen_build_items(resp, movie, item_field, item, first, second)
+
+        # Construct the CastItems, DirectorItems, DistributorItems, and ProductionCoItems.
+        field_names = ["actor_name", "director", "distributor", "prod_co"]
+        for field_name in field_names:
+            if build_items(response, film, field_name):
+                for b_item in build_items(response, film, field_name):
+                    yield b_item
+
 
 
 

@@ -16,6 +16,11 @@ class DirectorItem(scrapy.Item):
     director = scrapy.Field()
 
 
+class DistributorItem(scrapy.Item):
+    film = scrapy.Field()
+    distributor = scrapy.Field()
+
+
 class MovieItem(scrapy.Item):
     film = scrapy.Field()
     budget = scrapy.Field()
