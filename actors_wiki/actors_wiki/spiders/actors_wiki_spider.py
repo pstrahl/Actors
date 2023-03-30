@@ -1,11 +1,12 @@
 from __future__ import print_function
 
+import logging
 from time import sleep
 
 import scrapy
+from scrapy.utils.log import configure_logging
 
 from actors_wiki.items import CastItem, DirectorItem, DistributorItem, MovieItem, ProductionCoItem
-
 
 class Actorswiki(scrapy.Spider):
     """
@@ -13,11 +14,12 @@ class Actorswiki(scrapy.Spider):
     each film's wikipedia page for the list of starring actors, director(s), distributor(s),
     production companies, budget, box office, and release date.
     """
+
     name = 'actors_wiki_spider'
     # allowed_domains = ["en.wikipedia.org/"]
 
     def start_requests(self):
-        for num in range(2022, 2023):
+        for num in range(2018, 2023):
             movie_by_year = "https://en.wikipedia.org/wiki/List_of_American_films_of_{}".format(num)
             yield scrapy.Request(url=movie_by_year, callback=self.parse_list)
 

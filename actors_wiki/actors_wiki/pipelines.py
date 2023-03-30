@@ -53,49 +53,109 @@ class DatePipeline:
                 pattern2 = r"(?P<Day>[1-3]*?[1-9])\s(?P<Month>[A-Z]{1}[a-z]+)\s(?P<Year>[0-9]{4})"
                 match1 = re.search(pattern1, release_date)
                 match2 = re.search(pattern2, release_date)
-                if match1:
-                    print("match1")
-                    month = match1.group("Month")
-                    day = match1.group("Day")
-                    year = match1.group("Year")
-                    if len(day) == 1:
-                        day = '0' + day
-                    try:
-                        new_date = " ".join([month, day, year])
-                        dt = datetime.strptime(new_date, "%B %d %Y")
-                        item["release_date"] = dt.strftime("%Y-%m-%d")
-                        print(item["release_date"])
-                    except:
-                        new_date = " ".join([month, day, year])
-                        dt = datetime.strptime(new_date, "%b %d %Y")
-                        item["release_date"] = dt.strftime("%Y-%m-%d")
-                        print(item["release_date"])
-                elif match2:
-                    print("match2")
-                    month = match2.group("Month")
-                    day = match2.group("Day")
-                    year = match2.group("Year")
-                    if len(day) == 1:
-                        day = '0' + day
-                    try:
-                        new_date = " ".join([month, day, year])
-                        dt = datetime.strptime(new_date, "%B %d %Y")
-                        item["release_date"] = dt.strftime("%Y-%m-%d")
-                        print(item["release_date"])
-                    except:
-                        new_date = " ".join([month, day, year])
-                        dt = datetime.strptime(new_date, "%b %d %Y")
-                        item["release_date"] = dt.strftime("%Y-%m-%d")
-                        print(item["release_date"])
+                for match in [match1, match2]:
+                    if match:
+                        print("match:{}".format(match))
+                        month = match.group("Month")
+                        day = match.group("Day")
+                        year = match.group("Year")
+                        if len(day) == 1:
+                            day = "0" + day
+                        try:
+                            new_date = " ".join([month, day, year])
+                            dt = datetime.strptime(new_date, "%B %d %Y")
+                            item["release_date"] = dt.strftime("%Y-%m-%d")
+                            print(item["release_date"])
+                        except:
+                            new_date = " ".join([month, day, year])
+                            dt = datetime.strptime(new_date, "%b %d %Y")
+                            item["release_date"] = dt.strftime("%Y-%m-%d")
+                            print(item["release_date"])
             elif len(release_date) == 4:
                 item["release_date"] = "-".join([release_date, "01", "01"])
                 print(item["release_date"])
         return item
 
 
+class MoneyPipeline:
+    """
+    This class is used to clean the budget and box_office strings.
+    """
+    def process_item(self, item, actors_wiki_spider):
+        """
+        Remove "$", "\xa0" strings and convert strings to numbers.
+
+        If the item is a movie item, remove '$' signs, '\xa0' strings,
+        and convert words like million or thousand to 1000000 or 1000.
+
+        Args:
+             item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
+            or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
+            have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'/
+            MovieItems have 5 fields: 'film', 'director', 'budget','box_office', and 'release_date'.
+            ProductionCoItems have 2 fields: 'film' and 'prod_co'.
+
+            actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
+                for movies and their starring cast in the specified time range.
+
+        Returns:
+            item
+        """
+        if "budget" in item.keys():
+            budget = item["budget"]
+            box_office = item["box_office"]
+
+            def number_cleaner(num_string):
+                """
+                Clean the num_string so it only consists of digits where the units are millions.
+
+                Args:
+                    num_string (str): This is the string which possibly consists of digits and
+                        words representing numbers
+                Returns:
+                    A string representing the number in digits where the units are in millions.
+                """
+                pattern = r"\\xa0|\$|,"
+                new_string = re.sub(pattern, "", num_string)
+                nums_pattern = r"(?P<upper>[\d]+\.[\d]+|[\d]+)-(?P<lower>[\d]+\.[\d]+|[\d]+)"
+                nums_match = re.search(nums_pattern, new_string)
+                mil_pattern = r"million"
+                bil_pattern = r"billion"
+                mil_match = re.search(mil_pattern, new_string)
+                bil_match = re.search(bil_pattern, new_string)
+                if nums_match:
+                    upper = float(nums_match.group("upper"))
+                    lower = float(nums_match.group("lower"))
+                    number = (upper + lower)/2
+                    if mil_match:
+                        return number
+                    elif bil_match:
+                        return str(number*1000)
+                    else:
+                        return str(number/1000000)
+                else:
+                    num_pattern = r"(?P<decimal>[\d]+\.[\d]+|[\d]+)"
+                    num_match = re.search(num_pattern, new_string)
+                    number = float(num_match.group("decimal"))
+                    if mil_match:
+                        return number
+                    elif bil_match:
+                        return str(number*1000)
+                    else:
+                        return str(number/1000000)
+
+            if budget:
+                item["budget"] = number_cleaner(item["budget"])
+                print("budget:{}".format(item["budget"]))
+            if box_office:
+                item["box_office"] = number_cleaner(item["box_office"])
+                print("box_office:{}".format(item["box_office"]))
+        return item
+
+
 class DBPipeline:
     """
-    This class is used to store the actor and movie info in a MySQL database.
+    This class is used to store the movie info in a MySQL database.
 
     Attributes:
         u (string): the username to use for logging into MySQL (set
@@ -353,10 +413,6 @@ class DBPipeline:
             movie_id = self.cursor.fetchone()[0]
 
         # In the first case the item is a MovieItem.
-        # Need to handle the release date format using regex to see if
-        # it is already in the format YYYY-MM-DD. If it is not in this format
-        # use strptime and strftime in datetime module to convert it to this
-        # format.
         if "budget" in item.keys():
             movies_update_query = """UPDATE Movies
                                      SET 
@@ -367,10 +423,6 @@ class DBPipeline:
                                   """
             budget = item.get("budget")
             box_office = item.get("box_office")
-            # Need to handle the release date format using regex to see if
-            # it is already in the format YYYY-MM-DD. If it is not in this format
-            # use strptime and strftime in datetime module to convert it to this
-            # format.
             release_date = item.get("release_date")
             self.cursor.execute(movies_update_query, (budget, box_office, release_date, movie_id))
 

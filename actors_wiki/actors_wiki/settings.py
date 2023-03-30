@@ -12,6 +12,9 @@ BOT_NAME = "actors_wiki"
 SPIDER_MODULES = ["actors_wiki.spiders"]
 NEWSPIDER_MODULE = "actors_wiki.spiders"
 
+LOG_FILE = "log.txt"
+LOG_FILE_APPEND = False
+LOG_ENABLED = True
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = "actors_wiki (+http://www.yourdomain.com)"
@@ -63,6 +66,7 @@ ROBOTSTXT_OBEY = True
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {"actors_wiki.pipelines.DatePipeline": 300,
+                  "actors_wiki.pipelines.MoneyPipeline": 600,
                   "actors_wiki.pipelines.DBPipeline": 800}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
