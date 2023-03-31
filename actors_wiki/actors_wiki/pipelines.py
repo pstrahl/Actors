@@ -44,37 +44,75 @@ class DatePipeline:
             item
         """
         if "release_date" in item.keys():
-            print("beginning DatePipeline")
             release_date = item.get("release_date", None)
-            pattern = r"[a-z]+"
-            if release_date and re.findall(pattern, release_date):
-                print("Assessing release_date")
-                pattern1 = r"(?P<Month>[A-Z][a-z]+)\s(?P<Day>[1-3]*?[1-9]),\s(?P<Year>[0-9]{4})"
-                pattern2 = r"(?P<Day>[1-3]*?[1-9])\s(?P<Month>[A-Z]{1}[a-z]+)\s(?P<Year>[0-9]{4})"
-                match1 = re.search(pattern1, release_date)
-                match2 = re.search(pattern2, release_date)
-                for match in [match1, match2]:
-                    if match:
-                        print("match:{}".format(match))
-                        month = match.group("Month")
-                        day = match.group("Day")
-                        year = match.group("Year")
-                        if len(day) == 1:
-                            day = "0" + day
-                        try:
-                            new_date = " ".join([month, day, year])
-                            dt = datetime.strptime(new_date, "%B %d %Y")
-                            item["release_date"] = dt.strftime("%Y-%m-%d")
-                            print(item["release_date"])
-                        except:
-                            new_date = " ".join([month, day, year])
-                            dt = datetime.strptime(new_date, "%b %d %Y")
-                            item["release_date"] = dt.strftime("%Y-%m-%d")
-                            print(item["release_date"])
-            elif len(release_date) == 4:
-                item["release_date"] = "-".join([release_date, "01", "01"])
-                print(item["release_date"])
-        return item
+            if release_date:
+                junk_pattern = r"\(.+\)"
+                release_date = re.sub(junk_pattern, "", release_date)
+                alpha_pattern = r"[a-z]+"
+                if re.findall(alpha_pattern, release_date):
+                    alpha_mdy = r"(?P<Month>[A-Z][a-z]+)\s(?P<Day>[0-3][0-9]|[0-9]),\s(?P<Year>[0-9]{4})"
+                    alpha_dmy = r"(?P<Day>[0-3][0-9]|[0-9])\s(?P<Month>[A-Z][a-z]+)\s(?P<Year>[0-9]{4})"
+                    alpha_ymd = r"(P<Year>[0-9]{4})[/\-]{1}(?P<Month>[A-Z][a-z]+)[/\-]{1}(?P<Day>[0-3][0-9]|[0-9])"
+                    alpha_ym = r"(?P<Year>[0-9]{4})[/\- ]{1}(?P<Month>[A-Z][a-z]+)"
+                    alpha_my = r"(?P<Month>[A-Z][a-z]+)[/\- ]{1}(?P<Year>[0-9]{4})"
+                    alpha_patterns = [alpha_mdy, alpha_dmy,
+                                      alpha_ymd, alpha_ym,
+                                      alpha_my]
+                    for pattern in alpha_patterns:
+                        match = re.search(pattern, release_date)
+                        if match:
+                            print("match:{}".format(match))
+                            month = match.group("Month")
+                            year = match.group("Year")
+                            if "Day" in match.groupdict().keys():
+                                day = match.group("Day")
+                                if len(day) == 1:
+                                    day = "0" + day
+                            else:
+                                day = "01"
+
+                            try:
+                                new_date = " ".join([month, day, year])
+                                dt = datetime.strptime(new_date, "%B %d %Y")
+                                item["release_date"] = dt.strftime("%Y-%m-%d")
+                                print(item["release_date"])
+                                return item
+                            except:
+                                new_date = " ".join([month, day, year])
+                                dt = datetime.strptime(new_date, "%b %d %Y")
+                                item["release_date"] = dt.strftime("%Y-%m-%d")
+                                print(item["release_date"])
+                                return item
+
+                else:
+                    ymd = r"(?P<Year>[0-9]{4})[/\- ]{1}(?P<Month>[0-1][0-9]|[0-9])[/\- ](?P<Day>[0-3][0-9]|[0-9])"
+                    ym = r"(?P<Year>[0-9]{4})[/\- ]{1}(?P<Month>[0-1][0-9]|[0-9])"
+                    my = r"(?P<Month>[0-1][0-9]|[0-9])[/\- ]{1}(?P<Year>[0-9]{4})"
+                    y = r"(?P<Year>[0-9]{4})"
+                    num_patterns = [ymd, ym, my, y]
+                    for pattern in num_patterns:
+                        match = re.search(pattern, release_date)
+                        if match:
+                            print("match:{}".format(match))
+                            year = match.group("Year")
+                            if "Day" in match.groupdict().keys():
+                                day = match.group("Day")
+                                if len(day) == 1:
+                                    day = "0" + day
+                            else:
+                                day = "01"
+                            if "Month" in match.groupdict().keys():
+                                month = match.group("Month")
+                                if len(month) == 1:
+                                    month = "0" + month
+                            else:
+                                month = "01"
+                            item["release_date"] = "-".join([year, month, day])
+                            return item
+            else:
+                return item
+        else:
+            return item
 
 
 class MoneyPipeline:
@@ -128,21 +166,24 @@ class MoneyPipeline:
                     lower = float(nums_match.group("lower"))
                     number = (upper + lower)/2
                     if mil_match:
-                        return number
+                        return f"{number:.6f}"
                     elif bil_match:
-                        return str(number*1000)
+                        return f"{number*1000:.6f}"
                     else:
-                        return str(number/1000000)
+                        return f"{number/1000000:.6f}"
                 else:
                     num_pattern = r"(?P<decimal>[\d]+\.[\d]+|[\d]+)"
                     num_match = re.search(num_pattern, new_string)
-                    number = float(num_match.group("decimal"))
-                    if mil_match:
-                        return number
-                    elif bil_match:
-                        return str(number*1000)
+                    if num_match:
+                        number = float(num_match.group("decimal"))
                     else:
-                        return str(number/1000000)
+                        number = 1
+                    if mil_match:
+                        return f"{number:.6f}"
+                    elif bil_match:
+                        return f"{number*1000:.6f}"
+                    else:
+                        return f"{number/1000000:.6f}"
 
             if budget:
                 item["budget"] = number_cleaner(item["budget"])

@@ -65,7 +65,7 @@ class Actorswiki(scrapy.Spider):
         box_office = response.xpath('//tr[contains(th, "Box office")]/td/text()').get()
 
         row = response.xpath('//tr[contains(th/div, "date") or contains(th, "date")]/td')
-        release_date = row.xpath('//li[text()[contains(., "States")]]/span/span/text()').get()
+        release_date = row.xpath('//li[text()[contains(., "States") or contains(., "US")]]/span/span/text()').get()
         if not release_date:
             release_date = row.xpath('//li[1]/span/span/text()').get()
         if not release_date:
