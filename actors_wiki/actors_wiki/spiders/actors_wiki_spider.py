@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import logging
+import re
 from time import sleep
 
 import scrapy
@@ -19,8 +20,8 @@ class Actorswiki(scrapy.Spider):
     # allowed_domains = ["en.wikipedia.org/"]
 
     def start_requests(self):
-        for num in range(2018, 2023):
-            movie_by_year = "https://en.wikipedia.org/wiki/List_of_American_films_of_{}".format(num)
+        for num in range(2003, 2023):
+            movie_by_year = f"https://en.wikipedia.org/wiki/List_of_American_films_of_{num}"
             yield scrapy.Request(url=movie_by_year, callback=self.parse_list)
 
     def parse_list(self, response):
@@ -37,7 +38,7 @@ class Actorswiki(scrapy.Spider):
             table = response.xpath('//div/h2[contains(span[2], "'+month+'")]/following-sibling::table[1]/tbody/tr')
             for row in table:
                 sleep(2)
-                href = row.xpath('td/i/a/@href').get()
+                href = row.xpath('./td/i/a/@href').get()
                 yield scrapy.Request(url=response.urljoin(href), callback=self.parse_films)
 
     def parse_films(self, response):
@@ -58,33 +59,93 @@ class Actorswiki(scrapy.Spider):
                 HTTP response object arising from the request for one of the film pages.
         """
         # Construct a MovieItem
-        film = response.xpath('//h1[@id="firstHeading"]/i/text()').get()
-        if not film:
-            film = response.xpath('//h1[@id="firstHeading"]/span/text()').get()
-        budget = response.xpath('//tr[contains(th, "Budget")]/td/text()').get()
-        box_office = response.xpath('//tr[contains(th, "Box office")]/td/text()').get()
+        # from scrapy.shell import inspect_response
+        # inspect_response(response, self)
+        def get_movie_fields(paths):
+            """Get the film's name, budget, or box office.
 
-        row = response.xpath('//tr[contains(th/div, "date") or contains(th, "date")]/td')
-        release_date = row.xpath('//li[text()[contains(., "States") or contains(., "US")]]/span/span/text()').get()
-        if not release_date:
-            release_date = row.xpath('//li[1]/span/span/text()').get()
-        if not release_date:
-            release_date = row.xpath('span/span/text()').get()
-        if not release_date:
-            release_date = row.xpath('text()').get()
+            Args:
+                 paths (List[str]): This is the list of xpaths to use
+                     to get the field.
+            Returns:
+                This returns the film title, budget, or box office as a string.
+            """
+            for field_path in paths:
+                if response.xpath(field_path):
+                    return response.xpath(field_path).get()
+                else:
+                    continue
+            return None
+
+        def get_release_date(start_path, relative_paths, conditions):
+            """Get the release date of the film.
+
+            Args:
+                start_path (str): This is the path containing the rows of a table with a potential
+                    release date.
+                relative_paths (List(str)): This is the list of relative paths to try from the first
+                    row in rows_path.
+                conditions (List(function)): This is the list of conditions to check to verify
+                    that the result is the release date.
+
+            Returns:
+                This function returns the release date
+            """
+            rows = response.xpath(start_path)
+            if rows:
+                row = rows[0]
+                for rel_path, condition in zip(relative_paths, conditions):
+                    potential_date = row.xpath(rel_path).get()
+                    if potential_date and not condition(potential_date):
+                        return potential_date
+                    else:
+                        continue
+                return None
+            else:
+                return None
+
+
+        # This is for the film, budget, and box office.
+        film_paths = ['//h1[@id="firstHeading"]/i/text()',
+                      '//h1[@id="firstHeading"]/span/text()'
+                      ]
+        budget_paths = ['//tr[contains(th, "Budget")]/td/text()',
+                        '//tr[contains(th, "Budget")]/td/span/text()',
+                        '//tr[contains(th, "Budget")]/td//li[1]/text()'
+                        ]
+        box_office_paths = ['//tr[contains(th, "Box office")]/td/text()',
+                            '//tr[contains(th, "Box office")]/td/span/text()',
+                            '//tr[contains(th, "Box office")]/td//li[contains(., "total")]/text()',
+                            '//tr[contains(th, "Box office")]/td//li[1]/text()'
+                            ]
+        # This is for the release date.
+        rows_path = '//tr[contains(th/., "date") or contains(th/., "elease")]/td'
+        rel_paths = ['.//li[text()[contains(., "States") or contains(., "US")]]/span/span/text()',
+                     './/li[1]/span/span/text()',
+                     './span/span/text()',
+                     './text()']
+        condition_list = [lambda x: re.sub(r"\(|\)", "", x) == "United States",
+                          lambda x: len(x) < 4,
+                          lambda x: len(x) < 4,
+                          lambda x: len(x) < 4
+                         ]
+        # Now we build the movie item, keeping in mind that we will need access to these
+        # variables (film in particular) later when constructing the CastItems, DirectorItems,
+        # DistributorItems, and ProductionCoItems.
         m_item = MovieItem()
+        film = get_movie_fields(film_paths)
         m_item["film"] = film
+        budget = get_movie_fields(budget_paths)
         m_item["budget"] = budget
+        box_office = get_movie_fields(box_office_paths)
         m_item["box_office"] = box_office
+        release_date = get_release_date(rows_path, rel_paths, condition_list)
         m_item["release_date"] = release_date
         yield m_item
 
-        # Construct the ProductionCoItem(s).
-        prod_co_list = response.xpath('//tr[contains(th/div, "Production")]/td/div/div/ul')
-
         def gen_build_items(resp, movie, item_field, item, first, second):
             """
-            Build CastItems, DirectorItems, or ProductionCoItems.
+            Build CastItems, DirectorItems, DistributorItems, or ProductionCoItems.
 
             If the items to be constructed are CastItems, single_link and single
             are both None. Otherwise, single_link and single are the xpaths to use
@@ -111,14 +172,14 @@ class Actorswiki(scrapy.Spider):
             """
             first_path = resp.xpath(first)
             if first_path and first_path.xpath('li'):
-                if first_path.xpath('li/a/text()'):
-                    for field in first_path.xpath('li/a/text()').getall():
+                if first_path.xpath('./li/a/text()'):
+                    for field in first_path.xpath('./li/a/text()').getall():
                         built_item = item()
                         built_item["film"] = movie
                         built_item[item_field] = field
                         yield built_item
-                elif first_path.xpath('li/text()'):
-                    for field in first_path.xpath('li/text()').getall():
+                elif first_path.xpath('./li/text()'):
+                    for field in first_path.xpath('./li/text()').getall():
                         built_item = item()
                         built_item["film"] = movie
                         built_item[item_field] = field
@@ -126,14 +187,14 @@ class Actorswiki(scrapy.Spider):
 
             else:
                 second_path = resp.xpath(second)
-                if second_path and second_path.xpath('a/text()'):
-                    for field in second_path.xpath('a/text()').getall():
+                if second_path and second_path.xpath('./a/text()'):
+                    for field in second_path.xpath('./a/text()').getall():
                         built_item = item()
                         built_item["film"] = film
                         built_item[item_field] = field
                         yield built_item
-                elif second_path.xpath('text()'):
-                    for field in second_path.xpath('text()').getall():
+                elif second_path.xpath('./text()'):
+                    for field in second_path.xpath('./text()').getall():
                         built_item = item()
                         built_item["film"] = movie
                         built_item[item_field] = field
@@ -141,7 +202,7 @@ class Actorswiki(scrapy.Spider):
 
         def build_items(resp, movie, item_field):
             """
-            Construct the items corresponding to item_field using inner_build_items.
+            Construct the items corresponding to item_field using gen_build_items.
 
             Args:
                 resp (scrapy Response object): This is scrapy's representation of an HTTP

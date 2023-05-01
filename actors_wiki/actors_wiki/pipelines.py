@@ -15,6 +15,7 @@ from datetime import datetime, date
 
 import pymysql
 from dotenv import load_dotenv
+from scrapy.exceptions import DropItem
 
 load_dotenv()
 
@@ -61,7 +62,6 @@ class DatePipeline:
                     for pattern in alpha_patterns:
                         match = re.search(pattern, release_date)
                         if match:
-                            print("match:{}".format(match))
                             month = match.group("Month")
                             year = match.group("Year")
                             if "Day" in match.groupdict().keys():
@@ -75,13 +75,11 @@ class DatePipeline:
                                 new_date = " ".join([month, day, year])
                                 dt = datetime.strptime(new_date, "%B %d %Y")
                                 item["release_date"] = dt.strftime("%Y-%m-%d")
-                                print(item["release_date"])
                                 return item
                             except:
                                 new_date = " ".join([month, day, year])
                                 dt = datetime.strptime(new_date, "%b %d %Y")
                                 item["release_date"] = dt.strftime("%Y-%m-%d")
-                                print(item["release_date"])
                                 return item
 
                 else:
@@ -93,7 +91,6 @@ class DatePipeline:
                     for pattern in num_patterns:
                         match = re.search(pattern, release_date)
                         if match:
-                            print("match:{}".format(match))
                             year = match.group("Year")
                             if "Day" in match.groupdict().keys():
                                 day = match.group("Day")
@@ -110,7 +107,7 @@ class DatePipeline:
                             item["release_date"] = "-".join([year, month, day])
                             return item
             else:
-                return item
+                raise DropItem(f"Release date missing from item {item}")
         else:
             return item
 
@@ -129,7 +126,7 @@ class MoneyPipeline:
         Args:
              item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
             or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
-            have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'/
+            have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'.
             MovieItems have 5 fields: 'film', 'director', 'budget','box_office', and 'release_date'.
             ProductionCoItems have 2 fields: 'film' and 'prod_co'.
 
@@ -155,10 +152,10 @@ class MoneyPipeline:
                 """
                 pattern = r"\\xa0|\$|,"
                 new_string = re.sub(pattern, "", num_string)
-                nums_pattern = r"(?P<upper>[\d]+\.[\d]+|[\d]+)-(?P<lower>[\d]+\.[\d]+|[\d]+)"
+                nums_pattern = r"(?P<upper>[\d]+\.[\d]+|[\d]+)[-–—]{1}(?P<lower>[\d]+\.[\d]+|[\d]+)"
                 nums_match = re.search(nums_pattern, new_string)
-                mil_pattern = r"million"
-                bil_pattern = r"billion"
+                mil_pattern = r"million|Million"
+                bil_pattern = r"billion|Billion"
                 mil_match = re.search(mil_pattern, new_string)
                 bil_match = re.search(bil_pattern, new_string)
                 if nums_match:
@@ -187,10 +184,8 @@ class MoneyPipeline:
 
             if budget:
                 item["budget"] = number_cleaner(item["budget"])
-                print("budget:{}".format(item["budget"]))
             if box_office:
                 item["box_office"] = number_cleaner(item["box_office"])
-                print("box_office:{}".format(item["box_office"]))
         return item
 
 
@@ -218,43 +213,43 @@ class DBPipeline:
         self.cursor = self.conn.cursor()
         try:
             self.cursor.execute(
-                """CREATE DATABASE IF NOT EXISTS Actors_wiki
+                """CREATE DATABASE IF NOT EXISTS actors_wiki
                 DEFAULT CHARACTER SET utf8"""
                 )
         except pymysql.Error as err:
-            print("Failed creating database: {}".format(err))
+            print(f"Failed creating database: {err}")
             sys.exit()
 
-        self.cursor.execute("USE Actors_wiki")
+        self.cursor.execute("USE actors_wiki")
 
         # Add in better error handling here
-        self.conn.database = 'Actors_wiki'
+        self.conn.database = 'actors_wiki'
 
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Actors(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS actors(
                                actor_id INT AUTO_INCREMENT PRIMARY KEY,
                                actor VARCHAR(100) NOT NULL UNIQUE
                                )
                             """
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Directors(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS directors(
                                director_id INT AUTO_INCREMENT PRIMARY KEY,
                                director VARCHAR(100) NOT NULL UNIQUE
                                )
                             """
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Distributors(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS distributors(
                                distributor_id INT AUTO_INCREMENT PRIMARY KEY,
                                distributor VARCHAR(200) NOT NULL UNIQUE
                                )
                             """
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS ProductionCo(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS productionco(
                                prod_co_id INT AUTO_INCREMENT PRIMARY KEY,
                                prod_co VARCHAR(200) NOT NULL UNIQUE
                                )
                             """
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Movies(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS movies(
                                movie_id INT AUTO_INCREMENT PRIMARY KEY,
                                movie VARCHAR(200) NOT NULL UNIQUE,
                                budget VARCHAR(100) DEFAULT NULL,
@@ -263,46 +258,46 @@ class DBPipeline:
                                )
                             """
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Filmdirectors(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS filmdirectors(
                                movie_id INT,
                                director_id INT,
                                PRIMARY KEY(movie_id, director_id),
                                FOREIGN KEY(movie_id)
-                                   REFERENCES Movies(movie_id),
+                                   REFERENCES movies(movie_id),
                                FOREIGN KEY(director_id)
-                                   REFERENCES Directors(director_id)
+                                   REFERENCES directors(director_id)
                                )
                             """
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Filmdistributors(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS filmdistributors(
                                movie_id INT,
                                distributor_id INT,
                                PRIMARY KEY(movie_id, distributor_id),
                                FOREIGN KEY(movie_id)
-                                   REFERENCES Movies(movie_id),
+                                   REFERENCES movies(movie_id),
                                FOREIGN KEY(distributor_id)
-                                   REFERENCES Distributors(distributor_id)
+                                   REFERENCES distributors(distributor_id)
                                )
                             """
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Filmprodco(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS filmprodco(
                                movie_id INT,
                                prod_co_id INT,
                                PRIMARY KEY(movie_id, prod_co_id),
                                FOREIGN KEY(movie_id)
-                                   REFERENCES Movies(movie_id),
+                                   REFERENCES movies(movie_id),
                                FOREIGN KEY(prod_co_id)
-                                   REFERENCES ProductionCo(prod_co_id)
+                                   REFERENCES productionCo(prod_co_id)
                             )"""
                             )
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Castlist(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS castlist(
                                movie_id INT,
                                actor_id INT,
                                PRIMARY KEY(movie_id, actor_id),
                                FOREIGN KEY(movie_id)
-                                   REFERENCES Movies(movie_id),
+                                   REFERENCES movies(movie_id),
                                FOREIGN KEY(actor_id)
-                                   REFERENCES Actors(actor_id)
+                                   REFERENCES actors(actor_id)
                                )
                             """
                             )
@@ -311,7 +306,7 @@ class DBPipeline:
         """
         Insert the information from the items into the tables.
 
-        Find the Movie_id for the film in the Movies table or insert the film into the Movies table
+        Find the Movie_id for the film in the movies table or insert the film into the movies table
         with budget, box_office, and release_date as Null values.
 
         In the first case, the item is a MovieItem. We start by updating the budget, box_office, and
@@ -343,12 +338,12 @@ class DBPipeline:
                 item_field (str): This is either 'actor_name', 'director', or 'prod_co'.
                 item (scrapy Item): This is either a CastItem, DirectorItem, or ProductionCoItem.
                 id_query (str): This is the query used to obtain the id of the value of the item_field
-                    in the Actors table, Directors table, or ProductionCo table.
+                    in the actors table, directors table, distributors table or productionco table.
                 primary_insert_query (str): This is the query used to insert the value of the item_field
-                   into the Actors table, Directors table, or ProductionCo table.
+                   into the actors table, directors table, or productionco table.
                 foreign_insert_query (str): This is the query used to insert the movie_id and the value of
-                the id of the value of the item_field into the Castlist table, Filmdirectors table, or
-                Filmprodco table as foreign keys.
+                the id of the value of the item_field into the castlist table, filmdirectors table, or
+                filmprodco table as foreign keys.
 
             Returns:
                 None
@@ -371,7 +366,7 @@ class DBPipeline:
             Args:
                  cur (pymysql cursor object): : This is the cursor created from the pymsql connection object.
                 movie_id (str): This is the id of the movie in the Movies table
-                item (scrapy Item): This is either a CastItem, DirectorItem, or ProductionCoItem.
+                item (scrapy Item): This is either a CastItem, DirectorItem, DistributorItem, or ProductionCoItem.
 
             Returns:
                 None
@@ -379,13 +374,13 @@ class DBPipeline:
             if "actor_name" in item.keys() and item.get("actor_name", None):
                 item_field = "actor_name"
                 id_query = """SELECT actor_id
-                              FROM Actors 
+                              FROM actors 
                               WHERE actor = %s
                            """
-                primary_insert_query = """INSERT INTO Actors(actor)
+                primary_insert_query = """INSERT IGNORE INTO actors(actor)
                                           VALUES (%s)
                                        """
-                foreign_insert_query = """INSERT INTO Castlist(movie_id, actor_id)
+                foreign_insert_query = """INSERT IGNORE INTO castlist(movie_id, actor_id)
                                           VALUES (%s, %s)
                                        """
                 inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
@@ -393,39 +388,39 @@ class DBPipeline:
             elif "director" in item.keys() and item.get("director", None):
                 item_field = "director"
                 id_query = """SELECT director_id
-                              FROM Directors
+                              FROM directors
                               WHERE director = %s
                            """
-                primary_insert_query = """INSERT INTO Directors(director)
+                primary_insert_query = """INSERT IGNORE INTO directors(director)
                                           VALUES (%s)
                                        """
-                foreign_insert_query = """INSERT INTO Filmdirectors(movie_id, director_id)
+                foreign_insert_query = """INSERT IGNORE INTO filmdirectors(movie_id, director_id)
                                           VALUES (%s, %s)
                                        """
                 inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
             elif "distributor" in item.keys() and item.get("distributor", None):
                 item_field = "distributor"
                 id_query = """SELECT distributor_id
-                              FROM Distributors
+                              FROM distributors
                               WHERE distributor = %s
                            """
-                primary_insert_query = """INSERT INTO Distributors(distributor)
+                primary_insert_query = """INSERT IGNORE INTO distributors(distributor)
                                           VALUES (%s)
                                        """
-                foreign_insert_query = """INSERT INTO Filmdistributors(movie_id, distributor_id)
+                foreign_insert_query = """INSERT IGNORE INTO filmdistributors(movie_id, distributor_id)
                                           VALUES (%s, %s)
                                        """
                 inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
             elif "prod_co" in item.keys() and item.get("prod_co", None):
                 item_field = "prod_co"
                 id_query = """SELECT prod_co_id
-                              FROM ProductionCo
+                              FROM productionco
                               WHERE prod_co = %s
                            """
-                primary_insert_query = """INSERT INTO ProductionCo(prod_co)
+                primary_insert_query = """INSERT IGNORE INTO productionco(prod_co)
                                           VALUES (%s)
                                        """
-                foreign_insert_query = """INSERT INTO Filmprodco(movie_id, prod_co_id)
+                foreign_insert_query = """INSERT IGNORE INTO filmprodco(movie_id, prod_co_id)
                                           VALUES (%s, %s)
                                        """
                 inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
@@ -438,10 +433,10 @@ class DBPipeline:
         # Get the movie_id, this is used in all cases in what follows.
         film = item.get("film")
         movie_id_query = """SELECT movie_id
-                            FROM Movies
+                            FROM movies
                             WHERE movie = %s
                          """
-        movie_insert_query = """INSERT INTO Movies(movie)
+        movie_insert_query = """INSERT IGNORE INTO movies(movie)
                                 VALUES (%s)
                              """
         self.cursor.execute(movie_id_query, (film,))
@@ -455,7 +450,7 @@ class DBPipeline:
 
         # In the first case the item is a MovieItem.
         if "budget" in item.keys():
-            movies_update_query = """UPDATE Movies
+            movies_update_query = """UPDATE movies
                                      SET 
                                         budget = %s,
                                         box_office = %s,
