@@ -1,11 +1,9 @@
 from __future__ import print_function
 
-import logging
 import re
 from time import sleep
 
 import scrapy
-from scrapy.utils.log import configure_logging
 
 from actors_wiki.items import CastItem, DirectorItem, DistributorItem, MovieItem, ProductionCoItem
 
@@ -51,8 +49,8 @@ class Actorswiki(scrapy.Spider):
         Release date listed, or 3) it is listed as the Original air date.
 
         Next, we use build_items() to produce: DirectorItems with fields 'film', 'director',
-         ProductionCoItem with fields 'film' and 'prod_co' and CastItems with
-        fields 'film' and 'actor_name'.
+        DistributorItems with fields 'film' and 'distributor', ProductionCoItem with fields
+        'film' and 'prod_co' and CastItems with fields 'film' and 'actor_name'.
 
         Args:
             response (scrapy Response object): This is scrapy's representation of the
@@ -104,7 +102,6 @@ class Actorswiki(scrapy.Spider):
             else:
                 return None
 
-
         # This is for the film, budget, and box office.
         film_paths = ['//h1[@id="firstHeading"]/i/text()',
                       '//h1[@id="firstHeading"]/span/text()'
@@ -128,7 +125,7 @@ class Actorswiki(scrapy.Spider):
                           lambda x: len(x) < 4,
                           lambda x: len(x) < 4,
                           lambda x: len(x) < 4
-                         ]
+                          ]
         # Now we build the movie item, keeping in mind that we will need access to these
         # variables (film in particular) later when constructing the CastItems, DirectorItems,
         # DistributorItems, and ProductionCoItems.
@@ -159,11 +156,11 @@ class Actorswiki(scrapy.Spider):
                 item_field (str): This is either 'actor_name', 'director', 'distributor',
                 or 'prod_co' (the fields of the items CastItem, DirectorItem, DistributorItem
                 and ProductionCoItem, respectively, excluding 'film').
-                item (class): This is a reference to either a CastItem, DirectorItem,
+                item (class): This is a reference to either a CastItem, DirectorItem, DistributorItem,
                      or ProductionCoItem.
                 first (str): This is the first xpath to try in the case that there are more than one of
-                    the items of this type (CastItem, DirectorItem, or ProductionCoItem) to be
-                    associated with the movie. For CastItem, this will always be the case.
+                    the items of this type (CastItem, DirectorItem, DistributorItem, or ProductionCoItem)
+                    to be associated with the movie. For CastItems, this will always be the case.
                 second (str): This is the xpath to try if the first fails to
                     produce any results.
 
@@ -208,9 +205,9 @@ class Actorswiki(scrapy.Spider):
                 resp (scrapy Response object): This is scrapy's representation of an HTTP
                     response object arising from an HTTP request.
                 movie (str): This is the film title.
-                item_field (str): This is either 'actor_name', 'director', or 'prod_co' (the
-                    fields of the items CastItem, DirectorItem, and ProductionCoItem,
-                     respectively, excluding 'film').
+                item_field (str): This is either 'actor_name', 'director', 'distributor', or 'prod_co'
+                    (the fields of the items CastItem, DirectorItem, DistributorItem, and ProductionCoItem,
+                    respectively, excluding 'film').
 
             Returns:
                 gen_build_item (generator): This is the generator of items constructed
