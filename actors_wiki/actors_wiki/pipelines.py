@@ -32,11 +32,11 @@ class DatePipeline:
         item with the new date. Otherwise, the item is returned unchanged.
 
         Args:
-             item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
-            or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
-            have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'/
-            MovieItems have 5 fields: 'film', 'director', 'budget','box_office', and 'release_date'.
-            ProductionCoItems have 2 fields: 'film' and 'prod_co'.
+            item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
+                or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
+                have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'.
+                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date'.
+                ProductionCoItems have 2 fields: 'film' and 'prod_co'.
 
             actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
                 for movies and their starring cast in the specified time range.
@@ -124,11 +124,11 @@ class MoneyPipeline:
         and convert words like million or thousand to 1000000 or 1000.
 
         Args:
-             item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
-            or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
-            have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'.
-            MovieItems have 5 fields: 'film', 'director', 'budget','box_office', and 'release_date'.
-            ProductionCoItems have 2 fields: 'film' and 'prod_co'.
+            item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
+                or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
+                have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'.
+                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date'.
+                ProductionCoItems have 2 fields: 'film' and 'prod_co'.
 
             actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
                 for movies and their starring cast in the specified time range.
@@ -316,10 +316,10 @@ class DBPipeline:
 
         Args:
             item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
-            or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
-            have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'/
-            MovieItems have 5 fields: 'film', 'director', 'budget','box_office', and 'release_date'.
-            ProductionCoItems have 2 fields: 'film' and 'prod_co'.
+                or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
+                have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'/
+                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date'.
+                ProductionCoItems have 2 fields: 'film' and 'prod_co'.
 
             actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
                 for movies and their starring cast in the specified time range.
@@ -335,15 +335,15 @@ class DBPipeline:
             Args:
                 cur (pymysql cursor object): This is the cursor created from the pymsql connection object.
                 movie_id (str): This is the id of the movie in the Movies table
-                item_field (str): This is either 'actor_name', 'director', or 'prod_co'.
-                item (scrapy Item): This is either a CastItem, DirectorItem, or ProductionCoItem.
+                item_field (str): This is either 'actor_name', 'director', 'distributor', or 'prod_co'.
+                item (scrapy Item): This is either a CastItem, DirectorItem, DistributorItem, or ProductionCoItem.
                 id_query (str): This is the query used to obtain the id of the value of the item_field
                     in the actors table, directors table, distributors table or productionco table.
                 primary_insert_query (str): This is the query used to insert the value of the item_field
-                   into the actors table, directors table, or productionco table.
-                foreign_insert_query (str): This is the query used to insert the movie_id and the value of
-                the id of the value of the item_field into the castlist table, filmdirectors table, or
-                filmprodco table as foreign keys.
+                    into the actors table, directors table, distributors table, or productionco table.
+                foreign_insert_query (str): This is the query used to insert the movie_id and the id of the
+                    value of the item_field into the castlist table, filmdirectors table, filmdistributors table,
+                    or filmprodco table as foreign keys.
 
             Returns:
                 None
