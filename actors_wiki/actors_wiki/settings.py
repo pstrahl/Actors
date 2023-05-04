@@ -50,13 +50,13 @@ CONCURRENT_REQUESTS = 2
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    "actors_wiki.middlewares.ActorsImdbSpiderMiddleware": 543,
+#    "actors_wiki.middlewares.ActorsWikiSpiderMiddleware": 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    "actors_wiki.middlewares.ActorsImdbDownloaderMiddleware": 543,
+#    "actors_wiki.middlewares.ActorsWikiDownloaderMiddleware": 543,
 #}
 
 # Enable or disable extensions
