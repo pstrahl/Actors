@@ -32,6 +32,7 @@ actors_wiki_ER_diagram pdf.
 > scrapy crawl actors_wiki_spider
 <br>
 After this, the spider will perform the steps as outlined above and populate the MySQL database actors.
+As the spider crawls and items are created, the log.txt file stores the logging information at the logging.DEBUG level.
 
 ## Future Work
 In the future, we would like to add functionality to examine which actors have worked together and make predictions about which actors will work together in the future
