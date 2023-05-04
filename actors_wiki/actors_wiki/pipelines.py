@@ -11,7 +11,7 @@ import os
 import re
 import sys
 
-from datetime import datetime, date
+from datetime import datetime
 
 import pymysql
 from dotenv import load_dotenv
@@ -252,8 +252,8 @@ class DBPipeline:
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS movies(
                                movie_id INT AUTO_INCREMENT PRIMARY KEY,
                                movie VARCHAR(200) NOT NULL UNIQUE,
-                               budget VARCHAR(100) DEFAULT NULL,
-                               box_office VARCHAR(100) DEFAULT NULL,
+                               budget DECIMAL(12,6) DEFAULT NULL,
+                               box_office DECIMAL (12,6) DEFAULT NULL,
                                release_date DATE DEFAULT NULL
                                )
                             """

@@ -1,0 +1,4 @@
+scrapy~=2.8.0
+pymysql~=1.0.2
+python-dotenv~=0.21.0
+itemadapter~=0.7.0

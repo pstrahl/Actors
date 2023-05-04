@@ -20,7 +20,7 @@ class Actorswiki(scrapy.Spider):
     # allowed_domains = ["en.wikipedia.org/"]
 
     def start_requests(self):
-        for num in range(2003, 2023):
+        for num in range(2018, 2020):
             movie_by_year = f"https://en.wikipedia.org/wiki/List_of_American_films_of_{num}"
             yield scrapy.Request(url=movie_by_year, callback=self.parse_list)
 
