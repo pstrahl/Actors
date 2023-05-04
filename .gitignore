@@ -67,6 +67,7 @@ instance/
 
 # Scrapy stuff:
 .scrapy
+log.txt
 
 # Sphinx documentation
 docs/_build/
