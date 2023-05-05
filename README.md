@@ -23,12 +23,12 @@ actors_wiki_ER_diagram pdf.
 
 ## Usage
 **1.** This project requires python 3.10 or greater, scrapy 2.8.0, pymysql 1.0.2, python-dotenv 0.21.0, and itemadapter 0.7.0 to be imported; see the requirements.txt file for more information. <br>
-**2.** Prior to running the spider, a .env file should be created in the actors_wiki/actors_wiki directory. This contains:
+**2.** Prior to running the spider, a .env file should be created in the actors_repo/data_collection directory. This contains:
   - **DB_USER** (the username for connecting to the database) <br>
   - **DB_PSWD** (the password for connecting to the database) <br>
   - **DB_HOST** (the hostname for connecting to the database) <br>
   
-**3.** To run the spider in scrapy, from the command line navigate to the directory Actors/actors_wiki and enter the command 
+**3.** To run the spider in scrapy, from the command line navigate to the directory Actors/actors_repo and enter the command 
 > scrapy crawl actors_wiki_spider
 <br>
 After this, the spider will perform the steps as outlined above and populate the MySQL database actors.
