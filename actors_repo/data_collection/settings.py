@@ -1,4 +1,4 @@
-# Scrapy settings for actors_wiki project
+# Scrapy settings for data_collection project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -8,10 +8,10 @@
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 import logging
 
-BOT_NAME = "actors_wiki"
+BOT_NAME = "data_collection"
 
-SPIDER_MODULES = ["actors_wiki.spiders"]
-NEWSPIDER_MODULE = "actors_wiki.spiders"
+SPIDER_MODULES = ["data_collection.spiders"]
+NEWSPIDER_MODULE = "data_collection.spiders"
 
 LOG_FILE = "log.txt"
 LOG_FILE_APPEND = False
@@ -19,7 +19,7 @@ LOG_ENABLED = True
 LOG_LEVEL = logging.DEBUG
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = "actors_wiki (+http://www.yourdomain.com)"
+#USER_AGENT = "data_collection (+http://www.yourdomain.com)"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
@@ -50,13 +50,13 @@ CONCURRENT_REQUESTS = 2
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    "actors_wiki.middlewares.ActorsWikiSpiderMiddleware": 543,
+#    "data_collection.middlewares.ActorsWikiSpiderMiddleware": 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    "actors_wiki.middlewares.ActorsWikiDownloaderMiddleware": 543,
+#    "data_collection.middlewares.ActorsWikiDownloaderMiddleware": 543,
 #}
 
 # Enable or disable extensions
@@ -67,9 +67,9 @@ CONCURRENT_REQUESTS = 2
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-ITEM_PIPELINES = {"actors_wiki.pipelines.DatePipeline": 300,
-                  "actors_wiki.pipelines.MoneyPipeline": 600,
-                  "actors_wiki.pipelines.DBPipeline": 800}
+ITEM_PIPELINES = {"data_collection.pipelines.DatePipeline": 300,
+                  "data_collection.pipelines.MoneyPipeline": 600,
+                  "data_collection.pipelines.DBPipeline": 800}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

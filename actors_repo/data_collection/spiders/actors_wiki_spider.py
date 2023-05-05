@@ -5,7 +5,7 @@ from time import sleep
 
 import scrapy
 
-from actors_wiki.items import CastItem, DirectorItem, DistributorItem, MovieItem, ProductionCoItem
+from ..items import CastItem, DirectorItem, DistributorItem, MovieItem, ProductionCoItem
 
 class Actorswiki(scrapy.Spider):
     """
