@@ -21,7 +21,6 @@ from scrapy.exceptions import DropItem
 
 load_dotenv()
 
-
 class DatePipeline:
     """
     This class is used to clean up the date field for insertion into a MySQL database.
@@ -471,5 +470,4 @@ class DBPipeline:
         else:
             fill_tables(movie_id)
         self.conn.commit()
-        self.conn.close()
         return item
