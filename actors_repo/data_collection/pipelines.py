@@ -12,7 +12,9 @@ import re
 import sys
 
 from datetime import datetime
+from typing import Text
 
+import scrapy
 import pymysql
 from dotenv import load_dotenv
 from scrapy.exceptions import DropItem
@@ -24,25 +26,30 @@ class DatePipeline:
     """
     This class is used to clean up the date field for insertion into a MySQL database.
     """
-    def process_item(self, item, actors_wiki_spider):
+    def process_item(self, item: scrapy.Item, actors_wiki_spider: scrapy.Spider) -> scrapy.Item:
         """
         Rewrite the date in YYYY-MM-DD format.
 
-        If the item is a MovieItem, we will reformat the date in the YYYY-MM-DD format, and return the
-        item with the new date. Otherwise, the item is returned unchanged.
+        If the item is a MovieItem and the release date is not None, we reformat
+        the date in the YYYY-MM-DD format, and return the item with the new date.
+        If the item is a MovieItem and the release date is None, we raise a DropItem
+        exception. Otherwise, the item is returned unmodified.
 
         Args:
-            item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
-                or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
-                have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'.
-                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date'.
+            item (scrapy.Item): A CastItem, a DirectorItem, a DistributorItem, a MovieItem,
+                or a ProductionCoItem; CastItems have two fields: 'film' and 'actor_name'; DirectorItems
+                have 2 fields: 'film' and 'director'; DistributorItems have 2 fields: 'film' and 'distributor';
+                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date';
                 ProductionCoItems have 2 fields: 'film' and 'prod_co'.
 
-            actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
-                for movies and their starring cast in the specified time range.
+            actors_wiki_spider (scrapy.Spider): The spider used to scrape wikipedia
+                for the movie info for each movie in the US over the years 2003-2022 (inclusive).
 
         Returns:
-            item
+            item (scrapy.Item): The MovieItem with a modified date, otherwise the item unmodified.
+
+        Raises:
+            scrapy.exceptions.DropItem: if the item is a MovieItem and release_date is None.
         """
         if "release_date" in item.keys():
             release_date = item.get("release_date", None)
@@ -116,72 +123,74 @@ class MoneyPipeline:
     """
     This class is used to clean the budget and box_office strings.
     """
-    def process_item(self, item, actors_wiki_spider):
+    def process_item(self, item: scrapy.Item, actors_wiki_spider: scrapy.Spider) -> scrapy.Item:
         """
         Remove "$", "\xa0" strings and convert strings to numbers.
 
-        If the item is a movie item, remove '$' signs, '\xa0' strings,
-        and convert words like million or thousand to 1000000 or 1000.
+        If the item is a MovieItem, remove '$' signs, '\xa0' strings, and convert words
+        such as million or thousand to 1000000 or 1000, respectively. Otherwise,
+        return the item unmodified.
 
         Args:
-            item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
-                or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
-                have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'.
-                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date'.
+            item (scrapy.Item): A CastItem, a DirectorItem, a DistributorItem, a MovieItem,
+                or a ProductionCoItem; CastItems have two fields: 'film' and 'actor_name'; DirectorItems
+                have 2 fields: 'film' and 'director'; DistributorItems have 2 fields: 'film' and 'distributor';
+                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date';
                 ProductionCoItems have 2 fields: 'film' and 'prod_co'.
 
-            actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
-                for movies and their starring cast in the specified time range.
+            actors_wiki_spider (Scrapy Spider): The spider we used to scrape wikipedia
+                for movie info for each movie in the US over the years 2003-2022 (inclusive).
 
         Returns:
-            item
+            item (scrapy.Item): The original item with the box office and budget strings modified or
+            the original item unmodified (if the item is not a MovieItem).
         """
+        def number_cleaner(num_string: Text) -> Text:
+            """
+            Clean the num_string so it only consists of digits where the units are millions.
+
+            Args:
+                num_string (Text): The string which possibly consists of digits and
+                    words representing numbers
+            Returns:
+                (Text): A string representing the number in num_string in digits where the
+                units are in millions.
+                """
+            pattern = r"\\xa0|\$|,"
+            new_string = re.sub(pattern, "", num_string)
+            nums_pattern = r"(?P<upper>[\d]+\.[\d]+|[\d]+)[-–—]{1}(?P<lower>[\d]+\.[\d]+|[\d]+)"
+            nums_match = re.search(nums_pattern, new_string)
+            mil_pattern = r"million|Million"
+            bil_pattern = r"billion|Billion"
+            mil_match = re.search(mil_pattern, new_string)
+            bil_match = re.search(bil_pattern, new_string)
+            if nums_match:
+                upper = float(nums_match.group("upper"))
+                lower = float(nums_match.group("lower"))
+                number = (upper + lower)/2
+                if mil_match:
+                    return f"{number:.6f}"
+                elif bil_match:
+                    return f"{number*1000:.6f}"
+                else:
+                    return f"{number/1000000:.6f}"
+            else:
+                num_pattern = r"(?P<decimal>[\d]+\.[\d]+|[\d]+)"
+                num_match = re.search(num_pattern, new_string)
+                if num_match:
+                    number = float(num_match.group("decimal"))
+                else:
+                    number = 1
+                if mil_match:
+                    return f"{number:.6f}"
+                elif bil_match:
+                    return f"{number*1000:.6f}"
+                else:
+                    return f"{number/1000000:.6f}"
+
         if "budget" in item.keys():
             budget = item["budget"]
             box_office = item["box_office"]
-
-            def number_cleaner(num_string):
-                """
-                Clean the num_string so it only consists of digits where the units are millions.
-
-                Args:
-                    num_string (str): This is the string which possibly consists of digits and
-                        words representing numbers
-                Returns:
-                    A string representing the number in digits where the units are in millions.
-                """
-                pattern = r"\\xa0|\$|,"
-                new_string = re.sub(pattern, "", num_string)
-                nums_pattern = r"(?P<upper>[\d]+\.[\d]+|[\d]+)[-–—]{1}(?P<lower>[\d]+\.[\d]+|[\d]+)"
-                nums_match = re.search(nums_pattern, new_string)
-                mil_pattern = r"million|Million"
-                bil_pattern = r"billion|Billion"
-                mil_match = re.search(mil_pattern, new_string)
-                bil_match = re.search(bil_pattern, new_string)
-                if nums_match:
-                    upper = float(nums_match.group("upper"))
-                    lower = float(nums_match.group("lower"))
-                    number = (upper + lower)/2
-                    if mil_match:
-                        return f"{number:.6f}"
-                    elif bil_match:
-                        return f"{number*1000:.6f}"
-                    else:
-                        return f"{number/1000000:.6f}"
-                else:
-                    num_pattern = r"(?P<decimal>[\d]+\.[\d]+|[\d]+)"
-                    num_match = re.search(num_pattern, new_string)
-                    if num_match:
-                        number = float(num_match.group("decimal"))
-                    else:
-                        number = 1
-                    if mil_match:
-                        return f"{number:.6f}"
-                    elif bil_match:
-                        return f"{number*1000:.6f}"
-                    else:
-                        return f"{number/1000000:.6f}"
-
             if budget:
                 item["budget"] = number_cleaner(item["budget"])
             if box_office:
@@ -194,15 +203,15 @@ class DBPipeline:
     This class is used to store the movie info in a MySQL database.
 
     Attributes:
-        u (string): the username to use for logging into MySQL (set
+        u (Text): the username to use for logging into MySQL (set
             as an environment variable)
-        p (string): the password to use for logging into MySQL (set
+        p (Text): the password to use for logging into MySQL (set
             as an environment variable)
-        h (string): the hostname to use for logging into MySQL (set
+        h (Text): the hostname to use for logging into MySQL (set
             as an environment variable)
-        conn (pymysql Connection object): the Connection object created to
+        conn (pymysql.connections.Connection): the Connection object created to
             connect to MySQL
-        cursor (pymysql Cursor object): the resulting cursor created from the
+        cursor (pymysql.cursors.Cursor): the resulting cursor created from the
             Connection object
     """
     def __init__(self):
@@ -221,10 +230,7 @@ class DBPipeline:
             sys.exit()
 
         self.cursor.execute("USE actors_wiki")
-
-        # Add in better error handling here
         self.conn.database = 'actors_wiki'
-
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS actors(
                                actor_id INT AUTO_INCREMENT PRIMARY KEY,
                                actor VARCHAR(100) NOT NULL UNIQUE
@@ -288,7 +294,8 @@ class DBPipeline:
                                    REFERENCES movies(movie_id),
                                FOREIGN KEY(prod_co_id)
                                    REFERENCES productionCo(prod_co_id)
-                            )"""
+                               )
+                            """
                             )
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS castlist(
                                movie_id INT,
@@ -302,7 +309,7 @@ class DBPipeline:
                             """
                             )
 
-    def process_item(self, item, actors_wiki_spider):
+    def process_item(self, item: scrapy.Item, actors_wiki_spider: scrapy.Spider) -> scrapy.Item:
         """
         Insert the information from the items into the tables.
 
@@ -315,62 +322,61 @@ class DBPipeline:
         In the other cases, we use the fill_tables function to fill the respective tables.
 
         Args:
-            item (Scrapy Item object): This is a CastItem, a DirectorItem, a DistributorItem, a MovieItem,
-                or a ProductionCoItem. CastItems have two fields: 'film' and 'actor_name'. DirectorItems
-                have 2 fields: 'film' and 'director'. DistributorItems have 2 fields: 'film' and 'distributor'/
-                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date'.
+            item (scrapy.Item): A CastItem, a DirectorItem, a DistributorItem, a MovieItem,
+                or a ProductionCoItem; CastItems have two fields: 'film' and 'actor_name'; DirectorItems
+                have 2 fields: 'film' and 'director'; DistributorItems have 2 fields: 'film' and 'distributor';
+                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date';
                 ProductionCoItems have 2 fields: 'film' and 'prod_co'.
 
-            actors_wiki_spider (Scrapy Spider): This is the spider we used to scrape wikipedia
-                for movies and their starring cast in the specified time range.
+            actors_wiki_spider (scrapy.Spider): The spider we used to scrape wikipedia
+                for movie info for each movie in the US over the years 2003-2022 (inclusive).
 
         Returns:
-            item
+            item (scrapy.Item): The item is returned unmodified.
         """
 
-        def inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query):
+        def fill_tables(movie_id: Text) -> None:
             """
-            Populate the tables.
+            Fill the tables according to item subtype.
 
             Args:
-                cur (pymysql cursor object): This is the cursor created from the pymsql connection object.
-                movie_id (str): This is the id of the movie in the Movies table
-                item_field (str): This is either 'actor_name', 'director', 'distributor', or 'prod_co'.
-                item (scrapy Item): This is either a CastItem, DirectorItem, DistributorItem, or ProductionCoItem.
-                id_query (str): This is the query used to obtain the id of the value of the item_field
-                    in the actors table, directors table, distributors table or productionco table.
-                primary_insert_query (str): This is the query used to insert the value of the item_field
-                    into the actors table, directors table, distributors table, or productionco table.
-                foreign_insert_query (str): This is the query used to insert the movie_id and the id of the
-                    value of the item_field into the castlist table, filmdirectors table, filmdistributors table,
-                    or filmprodco table as foreign keys.
+                movie_id (Text): The id of the movie in the movies table.
 
             Returns:
                 None
             """
-            field = item.get(item_field)
-            cur.execute(id_query, (field,))
-            field_id_tup = cur.fetchone()
-            if field_id_tup:
-                field_id = field_id_tup[0]
-            else:
-                cur.execute(primary_insert_query, (field,))
+
+            def fill_helper(item_field: Text, id_query: Text, primary_insert_query: Text,
+                            foreign_insert_query: Text) -> None:
+                """
+                Populate the tables.
+
+                Args:
+                    item_field (Text): Either 'actor_name', 'director', 'distributor', or 'prod_co', depending on
+                        the subtype of the item.
+                    id_query (Text): The query used to obtain the id of the value of the item_field
+                        in the actors table, directors table, distributors table or productionco table.
+                    primary_insert_query (Text): The query used to insert the value of the item_field
+                        into the actors table, directors table, distributors table, or productionco table.
+                    foreign_insert_query (Text): The query used to insert the movie_id and the id of the
+                        value of the item_field into the castlist table, filmdirectors table, filmdistributors table,
+                        or filmprodco table as foreign keys.
+
+                Returns:
+                    None
+                """
+                field = item.get(item_field)
+                cur = self.cursor
                 cur.execute(id_query, (field,))
-                field_id = cur.fetchone()[0]
-            cur.execute(foreign_insert_query, (movie_id, field_id))
+                field_id_tup = cur.fetchone()
+                if field_id_tup:
+                    field_id = field_id_tup[0]
+                else:
+                    cur.execute(primary_insert_query, (field,))
+                    cur.execute(id_query, (field,))
+                    field_id = cur.fetchone()[0]
+                cur.execute(foreign_insert_query, (movie_id, field_id))
 
-        def fill_tables(cur, movie_id, item):
-            """
-            Fill the tables according to item.
-
-            Args:
-                 cur (pymysql cursor object): : This is the cursor created from the pymsql connection object.
-                movie_id (str): This is the id of the movie in the Movies table
-                item (scrapy Item): This is either a CastItem, DirectorItem, DistributorItem, or ProductionCoItem.
-
-            Returns:
-                None
-            """
             if "actor_name" in item.keys() and item.get("actor_name", None):
                 item_field = "actor_name"
                 id_query = """SELECT actor_id
@@ -383,8 +389,7 @@ class DBPipeline:
                 foreign_insert_query = """INSERT IGNORE INTO castlist(movie_id, actor_id)
                                           VALUES (%s, %s)
                                        """
-                inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
-
+                fill_helper(item_field, id_query, primary_insert_query, foreign_insert_query)
             elif "director" in item.keys() and item.get("director", None):
                 item_field = "director"
                 id_query = """SELECT director_id
@@ -397,7 +402,7 @@ class DBPipeline:
                 foreign_insert_query = """INSERT IGNORE INTO filmdirectors(movie_id, director_id)
                                           VALUES (%s, %s)
                                        """
-                inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
+                fill_helper(item_field, id_query, primary_insert_query, foreign_insert_query)
             elif "distributor" in item.keys() and item.get("distributor", None):
                 item_field = "distributor"
                 id_query = """SELECT distributor_id
@@ -410,7 +415,7 @@ class DBPipeline:
                 foreign_insert_query = """INSERT IGNORE INTO filmdistributors(movie_id, distributor_id)
                                           VALUES (%s, %s)
                                        """
-                inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
+                fill_helper(item_field, id_query, primary_insert_query, foreign_insert_query)
             elif "prod_co" in item.keys() and item.get("prod_co", None):
                 item_field = "prod_co"
                 id_query = """SELECT prod_co_id
@@ -423,7 +428,7 @@ class DBPipeline:
                 foreign_insert_query = """INSERT IGNORE INTO filmprodco(movie_id, prod_co_id)
                                           VALUES (%s, %s)
                                        """
-                inner_fill_tables(cur, movie_id, item_field, item, id_query, primary_insert_query, foreign_insert_query)
+                fill_helper(item_field, id_query, primary_insert_query, foreign_insert_query)
 
         # Get rid of any double quotation marks in any fields of the item.
         for key in item.keys():
@@ -461,9 +466,10 @@ class DBPipeline:
             box_office = item.get("box_office")
             release_date = item.get("release_date")
             self.cursor.execute(movies_update_query, (budget, box_office, release_date, movie_id))
-
+        # In the remaining cases the item is either a CastItem, DirectorItem, DistributorItem, or
+        # a ProductionCoItem.
         else:
-            fill_tables(self.cursor, movie_id, item)
+            fill_tables(movie_id)
         self.conn.commit()
-
+        self.conn.close()
         return item
