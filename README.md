@@ -14,9 +14,10 @@ and starring castlist. <br>
   - **DistributorItems** contain the fields "film" and "distributor" <br>
   - **ProductionCoItems** contain the fields "film" and "prod_co" <br>
 
-**4.** These items are then passed to the item pipeline, the first step of which is the **DatePipeline**. If the item is a MovieItem, this class cleans the release_date field and convert it into the 
+**4.** These items are then passed to the item pipeline, the first step of which is the **DropEmptyPipeline**. If the item_field is None after eliminating strings enclosed in brackets, braces, or parentheses, or other non-text characters, this step drops the item. If this is not the case, this step removes extraneous punctuation symbols from otherwise valid items.
+**5.** The second step is the **DatePipeline**. If the item is a MovieItem, this class cleans the release_date field and convert it into the 
 numerical YYYY-MM-DD or drops the MovieItem if the release_date is None. Otherwise the item is returned as is. <br>
-**5.** The second step is the **MoneyPipeline**, which cleans the budget and box_office fields (if the item is a MovieItem) so that they are represented as decimals with 6 places to the right of the decimal; 
+**5.** The third step is the **MoneyPipeline**, which cleans the budget and box_office fields (if the item is a MovieItem) so that they are represented as decimals with 6 places to the right of the decimal; 
 it is understood that these fields are now in terms of millions of dollars. If the item is not a MovieItem, it is returned as is. <br>
 **6.** Having cleaned the relevant fields for insertion into a MySQL database, the **DBPipeline** creates a MySQL database titled actors whose schema can be found in the 
 actors_wiki_ER_diagram pdf.
