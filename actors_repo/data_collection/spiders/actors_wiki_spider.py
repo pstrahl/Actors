@@ -174,20 +174,28 @@ class Actorswiki(scrapy.Spider):
 
                 first_path = resp.xpath(first)
                 if first_path and first_path.xpath('li'):
-                    if first_path.xpath('./li/a/text()'):
-                        for field in first_path.xpath('./li/a/text()').getall():
-                            yield item_helper(field)
-                    elif first_path.xpath('./li/text()'):
-                        for field in first_path.xpath('./li/text()').getall():
-                            yield item_helper(field)
+                    if first_path.xpath('.//li/a/text()'):
+                        for field in first_path.xpath('.//li/a/text()').getall():
+                            field = field.strip()
+                            if field:
+                                yield item_helper(field)
+                    if first_path.xpath('.//li/text()'):
+                        for field in first_path.xpath('.//li/text()').getall():
+                            field = field.strip()
+                            if field:
+                                yield item_helper(field)
                 else:
                     second_path = resp.xpath(second)
                     if second_path and second_path.xpath('./a/text()'):
                         for field in second_path.xpath('./a/text()').getall():
-                            yield item_helper(field)
-                    elif second_path.xpath('./text()'):
+                            field = field.strip()
+                            if field:
+                                yield item_helper(field)
+                    if second_path.xpath('./text()'):
                         for field in second_path.xpath('./text()').getall():
-                            yield item_helper(field)
+                            field = field.strip()
+                            if field:
+                                yield item_helper(field)
 
             if item_field == "actor_name":
                 item = CastItem

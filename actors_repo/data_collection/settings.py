@@ -67,7 +67,8 @@ CONCURRENT_REQUESTS = 2
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-ITEM_PIPELINES = {"data_collection.pipelines.DatePipeline": 300,
+ITEM_PIPELINES = {"data_collection.pipelines.DropEmptyPipeline": 100,
+                  "data_collection.pipelines.DatePipeline": 300,
                   "data_collection.pipelines.MoneyPipeline": 600,
                   "data_collection.pipelines.DBPipeline": 800}
 

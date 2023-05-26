@@ -21,6 +21,76 @@ from scrapy.exceptions import DropItem
 
 load_dotenv()
 
+
+class DropEmptyPipeline:
+    """
+    This class is used to drop empty items.
+    """
+    def process_item(self, item: scrapy.Item, actors_wiki_spider: scrapy.Spider) -> scrapy.Item:
+        """
+        Drop the items whose name fields are missing.
+
+        If the item is a MovieItem and the film is None, drop the item.
+        If the item is a CastItem and the film or actor_name is None, drop the item.
+        If the item is a DirectorItem and the film or director is None, drop the item.
+        If the item is a DistributorItem and the film or distributor is None, drop the item.
+        If the item is a ProductionCoItem and the film or prod_co is None, drop the item.
+
+        Args:
+            item (scrapy.Item): A CastItem, a DirectorItem, a DistributorItem, a MovieItem,
+                or a ProductionCoItem; CastItems have two fields: 'film' and 'actor_name'; DirectorItems
+                have 2 fields: 'film' and 'director'; DistributorItems have 2 fields: 'film' and 'distributor';
+                MovieItems have 4 fields: 'film', 'budget','box_office', and 'release_date';
+                ProductionCoItems have 2 fields: 'film' and 'prod_co'.
+
+            actors_wiki_spider (scrapy.Spider): The spider used to scrape wikipedia
+                for the movie info for each movie in the US over the years 2003-2022 (inclusive).
+
+        Returns:
+            item (scrapy.Item): The item if it is not missing one of the named fields (film, actor_name, director,
+            distributor, prod_co).
+
+        Raises:
+            scrapy.exceptions.DropItem: if the film, actor_name, director, distributor, or prod_co is None.
+        """
+        def drop_helper(item_field: Text) -> scrapy.Item:
+            """
+            Drop the item if item_field is None after removing non-letter characters.
+
+            Args:
+                item_field (Text): The field to check for
+
+            Returns:
+                item (scrapy.Item): The item from the outer scope with leading commas and
+                backslashes removed from item[item_field], or the item unmodified if item_field
+                is not in the item's keys.
+
+            Raises:
+                scrapy.exceptions.DropItem: if the item_field is None after removing the regular expression
+                pattern from item[item_field]
+            """
+            if item_field in item.keys():
+                pattern = r"[\[{]+.*[\]}]+|[({]+.*[)}]*|[({]*.*[)}]+|[,;!:()+\-/{}]+"
+                temp = re.sub(pattern, "", item.get(item_field))
+                if not temp:
+                    raise DropItem(f"{item_field} missing from item {item}")
+                else:
+                    pattern = r"^[,\/]+"
+                    new = re.sub(pattern, "", item.get(item_field))
+                    item[item_field] = new
+                    return item
+            else:
+                return item
+
+        if not item.get("film"):
+            raise DropItem(f"film title missing from item {item}")
+        drop_helper("actor_name")
+        drop_helper("director")
+        drop_helper("distributor")
+        drop_helper("prod_co")
+        return item
+
+
 class DatePipeline:
     """
     This class is used to clean up the date field for insertion into a MySQL database.
