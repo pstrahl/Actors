@@ -221,10 +221,10 @@ class DistributorsAnalysis(AnalyticsInterface):
             distributors_writer = csv.writer(csv_file, dialect='excel')
             distributors_writer.writerow(["distributor",
                                           "release year",
-                                          "box office max (in millions)"
-                                          "box office min (in millions)"
-                                          "film count"
-                                          "box office avg (in millions)"
+                                          "box office max (in millions)",
+                                          "box office min (in millions)",
+                                          "film count",
+                                          "box office avg (in millions)",
                                           "box office std (in millions)"
                                           ]
                                          )
@@ -292,10 +292,10 @@ class ProductionCoAnalysis(AnalyticsInterface):
             prod_co_writer = csv.writer(csv_file, dialect='excel')
             prod_co_writer.writerow(["production company",
                                      "release year",
-                                     "box office max (in millions)"
-                                     "box office min (in millions)"
-                                     "film count"
-                                     "box office avg (in millions)"
+                                     "box office max (in millions)",
+                                     "box office min (in millions)",
+                                     "film count",
+                                     "box office avg (in millions)",
                                      "box office std (in millions)"
                                      ]
                                     )
