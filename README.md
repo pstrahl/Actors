@@ -1,5 +1,5 @@
 # Actors
-This project uses scrapy and pymysql to scrape Wikipedia for film information and store the data in a MySQL database.
+This project uses scrapy and pymysql to scrape Wikipedia for film information, store the data in a MySQL database, and compute some statistics for each actor, director, distributor, and production company.
 
 ## Description
 To obtain the film information and store this information in the database: <br>
@@ -19,8 +19,12 @@ and starring castlist. <br>
 numerical YYYY-MM-DD or drops the MovieItem if the release_date is None. Otherwise the item is returned as is. <br>
 **6.** The third step is the **MoneyPipeline**, which cleans the budget and box_office fields (if the item is a MovieItem) so that they are represented as decimals with 6 places to the right of the decimal; 
 it is understood that these fields are now in terms of millions of dollars. If the item is not a MovieItem, it is returned as is. <br>
-**7.** Having cleaned the relevant fields for insertion into a MySQL database, the **DBPipeline** creates a MySQL database titled actors whose schema can be found in the 
-actors_wiki_ER_diagram pdf.
+**7.** Having cleaned the relevant fields for insertion into a MySQL database, the **DBPipeline** creates a MySQL database titled actors_wiki whose schema can be found in the 
+actors_wiki_ER_diagram pdf. <br>
+
+To query the database and store the resulting tables in csv files: <br>
+**8.** Having completed the above steps, for each actor and director, over the 20 year timespan, we find the box office maximum, minimum, average, and standard deviation, as well as the film count. This information is stored in two separate tables (one for actors and one for directors). <br>
+**9.** Since distribution and production companies tend to distribute or produce more than one film per year, we find the film count, box office maximum, minimum, average and standard deviation for each year as well as across all 20 years. As above, this information is stored in two separate tables (one for distribution companies and one for production companies).
 
 ## Usage
 **1.** This project requires python 3.10 or greater, scrapy 2.8.0, pymysql 1.0.2, python-dotenv 0.21.0, and itemadapter 0.7.0 to be imported; see the requirements.txt file for more information. <br>
@@ -28,12 +32,21 @@ actors_wiki_ER_diagram pdf.
   - **DB_USER** (the username for connecting to the database) <br>
   - **DB_PSWD** (the password for connecting to the database) <br>
   - **DB_HOST** (the hostname for connecting to the database) <br>
+  - **actors_path** (the filepath for storing the actors' box office statistics)
+  - **directors_path** (the filepath for storing the directors' box office statistics)
+  - **distributors_path** (the filepath for storing the distributors' box office statistics)
+  - **production_co_path** (the filepath for storing the production companies' box office statistics)
   
 **3.** To run the spider in scrapy, from the command line navigate to the directory Actors/actors_repo and enter the command 
 > scrapy crawl actors_wiki_spider
 <br>
 After this, the spider will perform the steps as outlined above and populate the MySQL database actors.
 As the spider crawls and items are created, the log.txt file stores the logging information at the logging.DEBUG level.
+
+**4.** Having completed the above steps, navigate to the subdirectory data_analysis and run the script analytics.py by entering the command
+> python analytics.py
+<br>
+This will create 4 new csv files in the locations specified in the .env file.
 
 ## Future Work
 In the future, we would like to add functionality to examine which actors have worked together and make predictions about which actors will work together in the future
