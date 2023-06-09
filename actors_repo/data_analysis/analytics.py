@@ -33,7 +33,7 @@ class AnalyticsInterface(ABC):
         table (List[List[Text]]): the table of the statistics (after calling the query method);
             initially this is set to None
     """
-    def __init__(self, statistic):
+    def __init__(self):
         self.u = os.environ.get('DB_USER')
         self.p = os.environ.get('DB_PSWD')
         self.h = os.environ.get('DB_HOST')
@@ -41,7 +41,6 @@ class AnalyticsInterface(ABC):
         self.cursor = self.conn.cursor()
         self.cursor.execute("USE actors_wiki")
         self.table = None
-        self.statistic = statistic
         # add assertion to verify that statistic is one of the statistics ["AVG", "MAX", "MIN", "STDEV", "STDEV_SAMP",
         # "VAR", "VAR_SAM"]
 
@@ -84,11 +83,11 @@ class ActorsAnalysis(AnalyticsInterface):
                            MIN(box_office) AS box_office_min,
                            CAST(AVG(box_office) AS DECIMAL(12,6)) AS box_office_avg,
                            IF(STDDEV(box_office),                                    
-                               CAST(STDDEV(box_office) AS DECIMAL(12, 6),
+                               CAST(STDDEV(box_office) AS DECIMAL(12, 6)),
                                0
                               ) AS box_office_std,
-                           COUNT(movie) AS film_count,   
-                       FROM cte AS c
+                           COUNT(movie) AS film_count  
+                       FROM cte AS c 
                        LEFT JOIN movies AS m
                        ON c.movie_id = m.movie_id
                        WHERE box_office is not null
@@ -140,10 +139,10 @@ class DirectorsAnalysis(AnalyticsInterface):
                               MIN(box_office) AS box_office_min,
                               CAST(AVG(box_office) AS DECIMAL(12,6)) AS box_office_avg,
                               IF(STDDEV(box_office),
-                                  CAST(STDDEV(box_office) AS DECIMAL(12, 6),
+                                  CAST(STDDEV(box_office) AS DECIMAL(12, 6)),
                                   0
                                  ) AS box_office_std,
-                              COUNT(movie) AS film_count,   
+                              COUNT(movie) AS film_count   
                           FROM cte AS c
                           LEFT JOIN movies AS m
                           ON c.movie_id = m.movie_id
@@ -210,9 +209,9 @@ class DistributorsAnalysis(AnalyticsInterface):
                                  COUNT(movie) AS film_count,
                                  CAST(AVG(box_office) AS DECIMAL(12, 6)) AS box_office_avg,
                                  IF(STDDEV(box_office),
-                                     CAST(STDDEV(box_office) AS DECIMAL(12, 6),
+                                     CAST(STDDEV(box_office) AS DECIMAL(12, 6)),
                                      0
-                                   ) AS box_office_std,
+                                   ) AS box_office_std
                              FROM cte AS c
                              GROUP BY
                                  distributor,
@@ -281,9 +280,9 @@ class ProductionCoAnalysis(AnalyticsInterface):
                                  COUNT(movie) AS film_count,
                                  CAST(AVG(box_office) AS DECIMAL(12, 6)) AS box_office_avg,
                                  IF(STDDEV(box_office),
-                                     CAST(STDDEV(box_office) AS DECIMAL(12, 6),
+                                     CAST(STDDEV(box_office) AS DECIMAL(12, 6)),
                                      0
-                                   ) AS box_office_std,
+                                   ) AS box_office_std
                              FROM cte AS c
                              GROUP BY
                                  prod_co,
@@ -315,19 +314,19 @@ class ProductionCoAnalysis(AnalyticsInterface):
 if __name__ == "__main__":
     actors_stats = ActorsAnalysis()
     actors_stats.query()
-    actors_stats_csv = os.environ.get('actors_analysis')
+    actors_stats_csv = os.environ.get('actors_path')
     actors_stats.store_csv(actors_stats_csv)
     directors_stats = DirectorsAnalysis()
     directors_stats.query()
-    directors_stats_csv = os.environ.get('directors_analysis')
+    directors_stats_csv = os.environ.get('directors_path')
     directors_stats.store_csv(directors_stats_csv)
     distributors_stats = DistributorsAnalysis()
     distributors_stats.query()
-    distributors_stats_csv = os.environ.get('distributors_analysis')
+    distributors_stats_csv = os.environ.get('distributors_path')
     distributors_stats.store_csv(distributors_stats_csv)
     production_co_stats = ProductionCoAnalysis()
     production_co_stats.query()
-    production_co_stats_csv = os.environ.get('production_co_analysis')
+    production_co_stats_csv = os.environ.get('production_co_path')
     production_co_stats.store_csv(production_co_stats_csv)
 
 
