@@ -1,15 +1,11 @@
 import csv
 import os
-import sys
 
-from datetime import datetime
-from typing import AnyStr, List, Sequence, Text, Tuple
+from typing import List, Text
 from abc import ABC, abstractmethod
 
-import scrapy
 import pymysql
 from dotenv import load_dotenv
-from scrapy.exceptions import DropItem
 
 load_dotenv()
 
@@ -29,7 +25,6 @@ class AnalyticsInterface(ABC):
             connect to MySQL
         cursor (pymysql.cursors.Cursor): the resulting cursor created from the
             Connection object
-        statistic (Text): the aggregate statistic to compute
         table (List[List[Text]]): the table of the statistics (after calling the query method);
             initially this is set to None
     """
@@ -41,9 +36,6 @@ class AnalyticsInterface(ABC):
         self.cursor = self.conn.cursor()
         self.cursor.execute("USE actors_wiki")
         self.table = None
-        # add assertion to verify that statistic is one of the statistics ["AVG", "MAX", "MIN", "STDEV", "STDEV_SAMP",
-        # "VAR", "VAR_SAM"]
-
 
     @abstractmethod
     def query(self):
